@@ -1,0 +1,15 @@
+.git/
+data/
+bin/
+dist/
+*.db
+*.db-shm
+*.db-wal
+agent/targets/*/
+# Claude-format agent copies (sync_claude_agents.sh output): cypture-agent also reads
+# .claude/agents/ for Claude-compat, but those copies carry no `mode:` line so it
+# defaults them to SUBAGENT — which shadows the .cypture/agents/ primaries and
+# breaks `cypture-agent run --agent <specialist>`. The cypture-agent container must see ONLY
+# .cypture/agents/ (the single source of truth). Keep this excluded.
+agent/.claude/
+**/__pycache__/

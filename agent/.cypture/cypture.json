@@ -1,0 +1,15 @@
+{
+  "mcp": {
+    "cyp": {
+      "type": "local",
+      "command": [
+        "cypture-engine",
+        "serve"
+      ],
+      "environment": {
+        "CYPTURE_ENGINE_URL": "http://localhost:8080"
+      },
+      "enabled": true
+    }
+  }
+}

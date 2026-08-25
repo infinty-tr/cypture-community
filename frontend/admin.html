@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/svg+xml" href="/css/favicon.svg">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0a0a09">
+    <title>Cypture · Admin Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/xterm.css">
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('cypture-theme') || 'dark';
+                document.documentElement.setAttribute('data-theme', t);
+            } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+        })();
+    </script>
+</head>
+<body>
+    <canvas id="bg-canvas"></canvas>
+    <div class="bg-grid"></div>
+    <div class="bg-scan"></div>
+    <div class="bg-vignette"></div>
+
+    <header id="app-header">
+        <div class="header-left">
+            <a href="/" class="logo-home" title="Home" aria-label="Back to home"><span class="logo logo-anim" aria-label="CYPTURE">
+                <span class="ll">C</span><span class="ll">Y</span><span class="ll">P</span><span class="ll ac">T</span><span class="ll ac">U</span><span class="ll ac">R</span><span class="ll ac">E</span>
+                <span class="logo-pac" aria-hidden="true"></span>
+            </span></a>
+            <span class="version-tag">ADMIN</span>
+        </div>
+        <div class="header-right">
+            <span class="sys-clock" id="sys-clock" aria-hidden="true">--:--:--</span>
+            <button class="theme-toggle" id="theme-toggle" type="button">DARK</button>
+            <button class="theme-toggle" id="logout-btn" type="button" title="Log out">LOG OUT</button>
+        </div>
+    </header>
+
+    <nav class="cyp-nav" id="cyp-nav">
+        <button class="nav-item active" data-view="overview" type="button">Overview</button>
+        <button class="nav-item" data-view="new" type="button">New Scan</button>
+        <button class="nav-item" data-view="queue" type="button">Approval Queue <span class="nav-count zero" id="nav-queue-count">0</span></button>
+        <button class="nav-item" data-view="scans" type="button">Scans <span class="nav-count zero" id="nav-scans-count">0</span></button>
+        <button class="nav-item" data-view="findings" type="button">Findings <span class="nav-count zero" id="nav-findings-count">0</span></button>
+        <div class="nav-group" id="nav-settings-group">
+            <button class="nav-item nav-group-btn" type="button" aria-haspopup="true" aria-expanded="false">Settings <span class="nav-caret">▾</span></button>
+            <div class="nav-dropdown" role="menu">
+                <button class="nav-item" data-view="users" data-sec="sec-provider" type="button" role="menuitem">Provider / Engine</button>
+                <button class="nav-item" data-view="users" data-sec="sec-pool" type="button" role="menuitem">AI Key Pool</button>
+                <button class="nav-item" data-view="traffic" type="button" role="menuitem">Traffic <span class="nav-count zero" id="nav-traffic-count">0</span></button>
+                <button class="nav-item" data-view="questions" type="button" role="menuitem">Decisions <span class="nav-count zero" id="nav-q-count">0</span></button>
+                <button class="nav-item" data-view="audit" type="button" role="menuitem">Log</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="admin-wrap" id="app-main">
+
+        <section class="view active" id="view-overview">
+            <div class="view-head"><h2>Overview</h2><span class="view-sub" id="ov-sub"></span></div>
+            <div class="stat-grid" id="stat-grid">
+                <div class="stat-card alert"><span class="stat-value" id="st-pending">0</span><span class="stat-label">Pending Requests</span></div>
+                <div class="stat-card"><span class="stat-value" id="st-running">0</span><span class="stat-label">Active Scans</span></div>
+                <div class="stat-card"><span class="stat-value" id="st-scans">0</span><span class="stat-label">Total Scans</span></div>
+                <div class="stat-card"><span class="stat-value" id="st-findings">0</span><span class="stat-label">Findings</span></div>
+            </div>
+            <div class="admin-card framed" style="margin-top:16px">
+                <i class="px-fx" aria-hidden="true"></i>
+                <h3><span class="idx">»</span> Recent Scans</h3>
+                <div class="scan-list" id="ov-recent"><p class="prompt-note">Loading…</p></div>
+            </div>
+        </section>
+
+        <section class="view" id="view-new">
+            <div class="view-head"><h2>New Scan</h2><span class="view-sub">Start directly without waiting for approval</span></div>
+            <section class="admin-card framed">
+                <i class="px-fx" aria-hidden="true"></i>
+                <p class="prompt-note">Enter the scope patterns and choose the mode. The accept/approval step is skipped · the scan starts immediately in an isolated environment. Only enter targets you are authorized to test.</p>
+                <div class="cyp-field"><label>Title (optional)</label><input class="cyp-input" id="ns-title" type="text" placeholder="e.g. Acme external surface" autocomplete="off"></div>
+                <div class="cyp-field"><label>INCLUDE scope patterns (comma-separated)</label><input class="cyp-input" id="ns-inc" type="text" placeholder="*.acme.com, api.acme.com, 10.0.0.0/24" autocomplete="off"></div>
+                <div class="cyp-field"><label>EXCLUDE scope patterns (comma-separated)</label><input class="cyp-input" id="ns-exc" type="text" placeholder="legacy.acme.com" autocomplete="off"></div>
+                <div class="cyp-field"><label>Mode</label>
+                    <div class="mode-seg" id="ns-mode">
+                        <button data-mode="full" class="active" type="button">Full</button>
+                        <button data-mode="attack" type="button">Attack</button>
+                        <button data-mode="web" type="button">Web</button>
+                        <button data-mode="api" type="button">API</button>
+                        <button data-mode="recon" type="button">Recon</button>
+                    </div>
+                </div>
+                <div class="cyp-field"><label>Model</label>
+                    <div class="mode-seg" id="ns-model">
+                        <button data-model="free" class="active" type="button">Standard (free)</button>
+                        <button data-model="fast" type="button">Fast</button>
+                        <button data-model="strong" type="button">Strong</button>
+                        <button data-model="frontier" type="button">Frontier</button>
+                    </div>
+                </div>
+                <div class="cyp-field"><label>Note (optional)</label><textarea class="cyp-textarea" id="ns-text" placeholder="scope note…"></textarea></div>
+                <div class="cyp-field"><label>Extra directive for the agent (optional)</label><textarea class="cyp-textarea" id="ns-prompt" placeholder="e.g. focus on the /api/v2 surface · try JWT RS256, key confusion · skip noisy fuzzing · emphasize business-logic / response manipulation"></textarea></div>
+                <div class="cyp-field"><label>Test identity / account (optional · authenticated test)</label><textarea class="cyp-textarea" id="ns-creds" placeholder="e.g. user1: alice@target.com / Password123 · user2: bob@target.com / Password456 · login: /login (provide two accounts for IDOR/BOLA). The agent logs in with these and tests the post-authentication surface."></textarea></div>
+                <div class="admin-row">
+                    <button class="btn btn-scan" id="ns-start" type="button"><span class="btn-icon">▶</span> <span class="btn-text">START SCAN</span></button>
+                    <span class="admin-msg" id="ns-msg"></span>
+                </div>
+            </section>
+        </section>
+
+        <section class="view" id="view-queue">
+            <div class="view-head"><h2>Scope Approval Queue</h2></div>
+            <section class="admin-card framed">
+                <i class="px-fx" aria-hidden="true"></i>
+                <p class="prompt-note">Review the requested scope (does it cover only assets you are authorized to test?). Confirm the host list, add a note, and accept · testing starts the moment you accept.</p>
+                <div id="queue-wrap"><p class="prompt-note">Loading…</p></div>
+            </section>
+        </section>
+
+        <section class="view" id="view-scans">
+            <div class="view-head"><h2>Scans</h2><span class="view-sub" id="scans-sub"></span><span class="spacer"></span>
+                <button class="btn btn-sm btn-ghost" id="scans-refresh" type="button">↻ Refresh</button></div>
+            <div class="scan-list" id="scan-list"><p class="prompt-note">Loading…</p></div>
+        </section>
+
+        <section class="view" id="view-live">
+            <div class="view-head">
+                <h2 id="live-title">Live Scan</h2><span class="view-sub" id="live-sub"></span>
+                <span class="spacer"></span>
+                <div class="live-readout">
+                    <span class="lr-cell"><b id="stat-status">·</b><i>Status</i></span>
+                    <span class="lr-cell"><b id="stat-vulns">0</b><i>Findings</i></span>
+                    <span class="lr-cell"><b id="stat-duration">00:00</b><i>Duration</i></span>
+                </div>
+                <button class="btn btn-sm btn-back" id="live-back" type="button">← Scans</button>
+                <button class="btn btn-stop btn-sm" id="live-stop" type="button" style="display:none">Stop</button>
+                <button class="btn btn-ghost btn-sm" id="report-button" type="button" style="display:none"><span class="btn-icon">↓</span> REPORT</button>
+            </div>
+
+            <div id="live-question" style="display:none"></div>
+
+            <div class="live-toggle">
+                <button class="lt-btn active" id="lt-cockpit" type="button">▦ Cockpit</button>
+                <button class="lt-btn" id="lt-terminal" type="button">▸ Go to Terminal</button>
+            </div>
+
+            <div id="live-cockpit" class="live-panel">
+            <div class="cockpit-grid">
+                <aside class="ck-pane ck-tree">
+                    <div class="ck-head">⛬ Module Tree</div>
+                    <div class="ck-body" id="agent-tree">
+                        <div class="ck-empty">Modules appear here as a tree once the scan starts.</div>
+                    </div>
+                </aside>
+
+                <main class="ck-pane ck-panes">
+                    <div class="ck-head">▦ Specialist Windows</div>
+                    <div class="ck-body agent-grid" id="agent-grid"></div>
+                </main>
+
+                <aside class="ck-pane ck-findings">
+                    <div class="ck-head">◆ Live Findings <span class="ck-count" id="live-find-count">0</span></div>
+                    <div class="ck-body" id="live-findings">
+                        <div class="ck-empty">Verified findings appear here in real time.</div>
+                    </div>
+                </aside>
+
+                <section class="ck-bottom">
+                    <div class="ck-pane ck-signal">
+                        <div class="ck-head">💡 Signal / Comment</div>
+                        <div class="ck-body" id="signal-stream">
+                            <div class="ck-empty">The engine comments here when it finds an interesting lead.</div>
+                        </div>
+                    </div>
+                    <div class="ck-pane ck-system">
+                        <div class="ck-head">⌗ Core / System
+                            <span class="live-ind" id="live-ind" aria-label="liveness" title="scan liveness">
+                                <span class="live-pac"></span>
+                                <span class="live-dot"></span><span class="live-dot"></span><span class="live-dot"></span>
+                            </span>
+                            <span class="spacer"></span>
+                            <button id="clear-feed-btn" class="btn btn-sm btn-ghost" type="button">Clear</button>
+                        </div>
+                        <div class="ck-body terminal-feed" id="terminal-feed"></div>
+                    </div>
+                </section>
+            </div>
+            </div>
+
+            <div id="live-terminal" class="live-panel" style="display:none">
+                <div class="cyp-term-wrap framed">
+                    <i class="px-fx" aria-hidden="true"></i>
+                    <div class="cyp-term-bar">
+                        <span class="cyp-term-dot r"></span><span class="cyp-term-dot y"></span><span class="cyp-term-dot g"></span>
+                        <span class="cyp-term-title" id="term-title">cypture</span>
+                        <span class="prompt-hint" style="margin-left:auto">read-only · ↑/↓ select specialist · Enter enter specialist · Esc back</span>
+                    </div>
+                    <div id="xterm" class="cyp-xterm"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="view" id="view-findings">
+            <div class="view-head">
+                <h2>Findings</h2>
+                <div class="sev-stats" id="findings-stats" aria-label="Severity distribution"></div>
+                <span class="spacer"></span>
+                <button id="export-findings-btn" class="btn btn-sm btn-ghost" type="button">Export</button>
+            </div>
+            <div class="findings-container" id="findings-container">
+                <div class="empty-state" id="findings-empty">
+                    <div class="empty-icon">⌖</div>
+                    <p class="empty-text">No findings yet</p>
+                    <p class="empty-subtext">Verified vulnerabilities appear here once a scan is opened</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="view" id="view-traffic">
+            <div class="view-head">
+                <h2>Traffic</h2>
+                <input type="search" id="traffic-filter" class="tr-filter" placeholder="search method / host / path / status…" oninput="Traffic.applyFilter(this.value)">
+            </div>
+            <div class="tr-proxy">
+                <div class="tr-table-wrap">
+                    <table class="tr-table">
+                        <thead><tr>
+                            <th class="tr-c-n">#</th><th class="tr-c-m">Method</th><th class="tr-c-s">Status</th>
+                            <th class="tr-c-h">Host</th><th class="tr-c-p">Path</th><th class="tr-c-l">Size</th><th class="tr-c-t">Time</th>
+                        </tr></thead>
+                        <tbody id="traffic-tbody"></tbody>
+                    </table>
+                    <div class="tr-empty" id="traffic-empty">No request records yet · once a scan starts, inbound/outbound requests will be listed here.</div>
+                </div>
+                <div class="tr-detail-pane" id="traffic-detail">
+                    <div class="tr-detail-empty">Select a request above to see its details.</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="view" id="view-users">
+            <div class="view-head"><h2>Settings</h2></div>
+            <section class="admin-card framed" id="sec-provider">
+                <i class="px-fx" aria-hidden="true"></i>
+                <h3><span class="idx">⚙</span> Provider / Engine Settings</h3>
+                <p class="prompt-note">Select your provider and enter the API key · the key is validated in the background, overrides .env, and is passed securely into the container.</p>
+                <div class="cyp-field"><label>Provider</label>
+                    <div class="mode-seg" id="set-provider">
+                        <button data-prov="openrouter" class="active" type="button">OpenRouter</button>
+                        <button data-prov="openai" type="button">OpenAI</button>
+                        <button data-prov="anthropic" type="button">Anthropic</button>
+                        <button data-prov="deepseek" type="button">DeepSeek</button>
+                    </div>
+                </div>
+                <div class="cyp-field"><label>API Key</label><input class="cyp-input" id="set-key" type="password" placeholder="sk-... / sk-or-..." autocomplete="off"><span class="prompt-note" id="set-key-cur"></span></div>
+                <div class="cyp-field"><label>Model</label><input class="cyp-input" id="set-model" type="text" placeholder="openai/gpt-4o-mini" autocomplete="off">
+                    <span class="prompt-note">Examples: <code>openai/gpt-4o-mini</code> · <code>openai/gpt-4o</code> · <code>openrouter/anthropic/claude-3-5-sonnet</code></span>
+                </div>
+                <div class="cyp-field"><label>Reasoning model (optional)</label><input class="cyp-input" id="set-reasoning" type="text" placeholder="openai/gpt-4o" autocomplete="off">
+                    <span class="prompt-note">When set, the <strong>web/api/reporter</strong> specialists run on this model; recon/fuzz stay on the cheap base model. <em>Must be the SAME provider as the base model</em> (a single key validates both · e.g. both <code>openrouter/…</code>). A tier label (<code>frontier</code>) is also accepted.</span>
+                </div>
+                <div class="admin-row">
+                    <button class="btn btn-ghost" id="set-validate" type="button">🔍 Validate</button>
+                    <button class="btn btn-primary" id="set-save" type="button">Save</button>
+                    <span class="admin-msg" id="set-msg"></span>
+                </div>
+            </section>
+
+            <section class="admin-card framed" id="sec-pool" style="margin-top:16px">
+                <i class="px-fx" aria-hidden="true"></i>
+                <h3><span class="idx">🔑</span> AI API Key Pool</h3>
+                <p class="prompt-note">Add the provider keys you have here · scans are distributed across these keys as <strong>sticky groups</strong>. If a key runs out or becomes invalid, that group automatically <strong>rotates</strong> to the next healthy key. If empty, the single key above is used.</p>
+                <div class="cyp-field"><label>Provider</label>
+                    <div class="mode-seg" id="pool-provider">
+                        <button data-prov="openrouter" class="active" type="button">OpenRouter</button>
+                        <button data-prov="openai" type="button">OpenAI</button>
+                        <button data-prov="anthropic" type="button">Anthropic</button>
+                        <button data-prov="deepseek" type="button">DeepSeek</button>
+                        <button data-prov="groq" type="button">Groq</button>
+                    </div>
+                </div>
+                <div class="cyp-field"><label>API Key</label><input class="cyp-input" id="pool-key" type="password" placeholder="sk-..." autocomplete="off"></div>
+                <div class="cyp-field"><label>Model (optional)</label><input class="cyp-input" id="pool-model" type="text" placeholder="openai/gpt-4o-mini" autocomplete="off"><span class="prompt-note">If empty, the Cypture default model is used. Enter a model <em>compatible</em> with the key's provider.</span></div>
+                <div class="cyp-field"><label>Label (optional)</label><input class="cyp-input" id="pool-label" type="text" placeholder="e.g. openrouter #1" autocomplete="off"></div>
+                <div class="admin-row">
+                    <button class="btn btn-ghost" id="pool-validate" type="button">🔍 Validate</button>
+                    <button class="btn btn-primary" id="pool-add" type="button">Add to Pool</button>
+                    <span class="admin-msg" id="pool-msg"></span>
+                </div>
+                <h4 style="margin:16px 0 8px">Keys in the Pool</h4>
+                <table class="cyp-table"><thead><tr><th>Provider</th><th>Key</th><th>Model</th><th>Users</th><th>Usage</th><th>Status</th><th>Action</th></tr></thead><tbody id="pool-tbody"></tbody></table>
+            </section>
+        </section>
+
+        <section class="view" id="view-questions">
+            <div class="view-head"><h2>Operator Decisions</h2></div>
+            <section class="admin-card framed">
+                <i class="px-fx" aria-hidden="true"></i>
+                <p class="prompt-note">When the agent asks for a decision, it appears here. You choose; if it times out, the system applies its default automatically.</p>
+                <div id="questions-wrap"><p class="prompt-note">No pending decisions.</p></div>
+            </section>
+        </section>
+
+        <section class="view" id="view-audit">
+            <div class="view-head"><h2>Audit Log</h2><span class="spacer"></span>
+                <button id="audit-refresh" class="btn btn-sm btn-ghost" type="button">Refresh</button></div>
+            <section class="admin-card framed">
+                <i class="px-fx" aria-hidden="true"></i>
+                <p class="prompt-note">All admin/system actions (who, when, what they did). Read-only.</p>
+                <table class="cyp-table"><thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Target</th><th>Detail</th><th>IP</th></tr></thead><tbody id="audit-tbody"></tbody></table>
+            </section>
+        </section>
+
+    </main>
+
+    <footer id="app-footer"><p>Cypture v2.1 · ADMIN CONSOLE</p><p style="color:#9a9a9a;font-size:11px;opacity:.75;margin-top:4px">⚠ Findings are AI-generated — don't trust results 100%, verify the output.</p></footer>
+    <div id="ai-disclaimer" style="position:fixed;bottom:4px;right:8px;z-index:99999;font-size:10px;color:#9a9a9a;opacity:.62;background:rgba(10,10,10,.45);padding:1px 7px;border-radius:6px;pointer-events:none;white-space:nowrap;letter-spacing:.02em">⚠ AI-generated · don't trust 100%, verify</div>
+
+    <script>
+        (function () {
+            var el = document.getElementById('sys-clock');
+            if (!el) return;
+            function tick() {
+                var d = new Date();
+                var p = function (n) { return String(n).padStart(2, '0'); };
+                el.textContent = p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+            }
+            tick(); setInterval(tick, 1000);
+        })();
+    </script>
+    <script src="js/bg.js"></script>
+    <script src="js/logo.js"></script>
+    <script src="js/theme.js"></script>
+    <script src="js/scanner.js"></script>
+    <script src="js/md.js"></script>
+    <script src="js/findings.js"></script>
+    <script src="js/traffic.js"></script>
+    <script src="js/vendor/xterm.js"></script>
+    <script src="js/vendor/addon-fit.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>

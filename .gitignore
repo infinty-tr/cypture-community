@@ -1,0 +1,64 @@
+# Virtual env
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Local config — never commit real secrets
+.env
+.env.*
+!.env.example
+
+# Runtime data
+findings/*.md
+!findings/.gitkeep
+config/system_prompt.txt
+
+# Go build / runtime
+/cypture
+/bin/
+/dist/
+*.test
+*.out
+
+# Local database & runtime state
+data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Agent engagement data (never commit real target data)
+agent/targets/*/
+!agent/targets/.gitkeep
+agent/.cypture/node_modules/
+agent/.cypture/run-state/
+
+# Staged engine binaries (large, host-copied)
+docker/bin/
+
+# Local editor / tool config
+.DS_Store
+.idea/
+.vscode/
+*.log
+.claude/
+agent/.claude/
+
+# Backups / dumps / cluster configs — never commit
+*.bak
+*.bak.*
+*.src-backup.*
+kube*.config
+cookie*.txt
+.setup_backup/
+pyghidra_mcp_projects/
+agent/.omo/
+agent/.cypture/plugin/ACTIVE_TARGET
+/tmp/opencode/

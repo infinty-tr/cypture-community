@@ -1,0 +1,24 @@
+# === GERÇEK ANGAJMAN VERİSİ — ASLA PUSH'LANMAZ ===
+# Her hedefin canlı durumu, recon çıktıları, bulguları ve raporları burada.
+# Gizlilik ve yasal nedenlerle public repo'ya GİTMEZ. Sadece sistem/şablon push'lanır.
+targets/*
+!targets/.gitkeep
+
+# Yedekler ve geçici durum
+*.bak
+firstphase.md.bak
+
+# Recon/fuzz geçici çıktıları (kök seviyede oluşursa)
+/recon_output/
+/js_files/
+/live_hosts.txt
+/subdomains_final.txt
+/tmp/
+
+# Bağımlılıklar
+node_modules/
+.cypture/node_modules/
+
+# OS / editör
+.DS_Store
+*.swp

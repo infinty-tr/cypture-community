@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/css/favicon.svg">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="description" content="Cypture — type your target, leave the rest to it. Autonomous security testing." />
+        <meta name="theme-color" content="#0a0a09" />
+        <title>Cypture</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet" />
+        <link rel="stylesheet" href="css/style.css" />
+        <script>
+            (function () {
+                try {
+                    var t = localStorage.getItem("cypture-theme") || "dark";
+                    document.documentElement.setAttribute("data-theme", t);
+                } catch (e) {
+                    document.documentElement.setAttribute("data-theme", "dark");
+                }
+            })();
+        </script>
+        <style>
+          .live-counter{margin:1.4rem auto 0;padding:1.1rem 1.2rem;border:1px solid rgba(255,176,0,.28);border-radius:16px;background:linear-gradient(180deg,rgba(255,176,0,.06),rgba(255,176,0,.01));max-width:680px}
+          .lc-head{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:#ffb000;display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;font-weight:600}
+          .lc-dot{width:8px;height:8px;border-radius:50%;background:#4ade80;animation:lcpulse 1.8s infinite}
+          @keyframes lcpulse{0%{box-shadow:0 0 0 0 rgba(74,222,128,.5)}70%{box-shadow:0 0 0 8px rgba(74,222,128,0)}100%{box-shadow:0 0 0 0 rgba(74,222,128,0)}}
+          .lc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
+          .lc-card{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:.85rem .5rem;border:1px solid rgba(128,128,128,.24);border-radius:12px;background:rgba(128,128,128,.06)}
+          .lc-card b{font-size:1.75rem;line-height:1;font-weight:800;font-variant-numeric:tabular-nums}
+          .lc-card span{font-size:.72rem;letter-spacing:.04em;opacity:.75;margin-top:.35rem}
+          .lc-card.crit{border-color:rgba(255,77,77,.35)}.lc-card.crit b{color:#ff4d4d}
+          .lc-card.high{border-color:rgba(255,140,26,.35)}.lc-card.high b{color:#ff8c1a}
+          .lc-card.med{border-color:rgba(224,176,0,.35)}.lc-card.med b{color:#e0b000}
+          .lc-card.low{border-color:rgba(58,159,214,.35)}.lc-card.low b{color:#3a9fd6}
+          .lc-card.tot{border-color:rgba(255,176,0,.45);background:rgba(255,176,0,.06)}
+          @media(max-width:520px){.lc-grid{grid-template-columns:repeat(2,1fr)}}
+          /* auth-flash guard: header login link hidden until auth resolves; visible when logged out, stays hidden when logged in */
+          .header-right a[href="/login"]{visibility:hidden}
+          body.auth-out .header-right a[href="/login"]{visibility:visible}
+        </style>
+    </head>
+    <body class="intro-active">
+        <canvas id="bg-canvas" data-chase="off"></canvas>
+        <div class="bg-grid"></div>
+        <div class="bg-scan"></div>
+        <div class="bg-vignette"></div>
+
+        <div class="intro" id="intro">
+            <div class="intro-ghost" id="intro-ghost" aria-hidden="true">
+                <span class="ghost-pupil ghost-pupil-l"></span>
+                <span class="ghost-pupil ghost-pupil-r"></span>
+            </div>
+            <div class="intro-wall" id="intro-wall" aria-hidden="true"></div>
+            <div class="wall-sign" id="wall-sign" aria-hidden="true">
+                <span class="wall-sign-text">KNOCK<br />KNOCK</span>
+            </div>
+            <div class="intro-text">LET'S HACK</div>
+        </div>
+
+        <header id="app-header">
+            <div class="header-left">
+                <span class="logo logo-anim" aria-label="CYPTURE">
+                    <span class="ll">C</span><span class="ll">Y</span><span class="ll">P</span><span class="ll ac">T</span><span class="ll ac">U</span><span class="ll ac">R</span><span class="ll ac">E</span>
+                    <span class="logo-pac" aria-hidden="true"></span>
+                </span>
+            </div>
+            <div class="header-right">
+                <a class="admin-link" href="/login">LOG IN</a>
+                <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light theme">LIGHT</button>
+            </div>
+        </header>
+
+        <main class="dash-main">
+            <section class="hero framed reveal">
+                <p class="hero-eyebrow">Autonomous security testing</p>
+                <h1>Type a single target. Let <span class="amber">Cypture</span> handle the rest.</h1>
+                <p>
+                    Most security tools run a long checklist from top to bottom, fill the screen
+                    with hundreds of "take a look at this" lines, and leave the hard part to you.
+                    Cypture doesn't work that way. All you have to do is type the address you want
+                    to test. No settings, no checkboxes, no technical knowledge required. From that
+                    moment on it gets to know the target, decides for itself where to look, chases
+                    down the leads it finds, and drives every step forward live, right before your
+                    eyes. When it's done you're left not with a long list of "maybes" but with
+                    findings shown to actually work and worth acting on.
+                </p>
+                <div class="hero-cta">
+                    <a class="btn btn-scan" href="/login"><span class="btn-icon">▶</span> LOG IN</a>
+                </div>
+                <div class="hero-stats">
+                    <div><b>One field</b><span>just type the target</span></div>
+                    <div><b>Live</b><span>watch every step instantly</span></div>
+                    <div><b>Proven</b><span>verified findings</span></div>
+                    <div><b>Open source</b><span>unlimited scans, no fee</span></div>
+                </div>
+                <div class="live-counter" id="live-counter">
+                    <div class="lc-grid">
+                        <div class="lc-card tot"><b id="lc-total">—</b><span>TOTAL FINDINGS</span></div>
+                        <div class="lc-card"><b id="lc-scans">0</b><span>SCANS</span></div>
+                        <div class="lc-card crit"><b id="lc-crit">0</b><span>CRITICAL</span></div>
+                        <div class="lc-card high"><b id="lc-high">0</b><span>HIGH</span></div>
+                        <div class="lc-card med"><b id="lc-med">0</b><span>MEDIUM</span></div>
+                        <div class="lc-card low"><b id="lc-low">0</b><span>LOW</span></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="dash-section">
+                <h2 class="section-title"><span class="idx">★</span> Why Cypture?</h2>
+                <p class="section-lead">An ordinary tool matches patterns and stops. Cypture thinks, tries, proves, and explains it in plain language. Scroll down.</p>
+
+                <div class="zigzag">
+                    <article class="zz-row reveal">
+                        <div class="zz-text">
+                            <span class="zz-eyebrow">01 · Reasons as it goes</span>
+                            <h3>Not a fixed list — decisions based on the situation</h3>
+                            <p>
+                                Cypture first understands what kind of structure the target is, then
+                                decides what to try based on what it sees. When an interesting door
+                                opens, it doesn't let go — it digs deeper. When a path hits a dead
+                                end, it doesn't keep knocking on the same door in vain; it tries
+                                another route. Every target is unique, and so is the approach it takes.
+                            </p>
+                        </div>
+                        <div class="zz-visual"><div class="zz-mock zz-mock-brain">
+                            <span>surface mapped</span><span>an interesting endpoint found</span>
+                            <span>digging deeper</span><span class="amber">approach updated</span>
+                        </div></div>
+                    </article>
+
+                    <article class="zz-row reveal reverse">
+                        <div class="zz-text">
+                            <span class="zz-eyebrow">02 · Nothing is hidden</span>
+                            <h3>You see the whole process live</h3>
+                            <p>
+                                You don't drop a target into a black box and wait hours for the
+                                result. As the work progresses, you watch every step live in a
+                                terminal stream, as if a team were right in front of you. You see
+                                instantly where it is, what it's focused on, and what it has found.
+                                Here transparency isn't a slogan — it's the screen itself.
+                            </p>
+                        </div>
+                        <div class="zz-visual"><div class="zz-mock zz-tiles">
+                            <span class="zz-tile">Recon ✓</span><span class="zz-tile on">Test ●</span>
+                            <span class="zz-tile">Deep dive ○</span><span class="zz-tile">Report</span>
+                        </div></div>
+                    </article>
+
+                    <article class="zz-row reveal">
+                        <div class="zz-text">
+                            <span class="zz-eyebrow">03 · Proof, not guesswork</span>
+                            <h3>Every finding is reproduced and verified</h3>
+                            <p>
+                                Before Cypture says it found a vulnerability, it triggers it once
+                                more and shows that it really works. It filters out false alarms on
+                                its own. What's left for you are findings worth acting on and truly
+                                exploitable. Next to each one, its severity and how it was proven are
+                                stated clearly.
+                            </p>
+                        </div>
+                        <div class="zz-visual"><div class="zz-mock zz-finding">
+                            <span class="crit">CRITICAL</span><span>record search field</span>
+                            <span class="amber">✓ verified</span>
+                        </div></div>
+                    </article>
+
+                    <article class="zz-row reveal reverse">
+                        <div class="zz-text">
+                            <span class="zz-eyebrow">04 · Presentation-ready report</span>
+                            <h3>Fit for both management and the team, in one click</h3>
+                            <p>
+                                Every scan turns into a professional report with an executive
+                                summary, risk breakdown, detailed findings, and clear remediation
+                                steps. You can bring the same document to a meeting and hand it
+                                straight to the developer team. No need to fuss with formatting — it
+                                comes ready.
+                            </p>
+                        </div>
+                        <div class="zz-visual"><div class="zz-mock zz-report">
+                            <span class="zz-rep-logo">CYPTURE · CONFIDENTIAL</span>
+                            <span class="zz-bar"><i style="width:80%"></i></span>
+                            <span class="zz-bar"><i style="width:55%"></i></span>
+                            <span class="zz-bar"><i style="width:30%"></i></span>
+                        </div></div>
+                    </article>
+
+                    <article class="zz-row reveal">
+                        <div class="zz-text">
+                            <span class="zz-eyebrow">05 · Only your target</span>
+                            <h3>Only the address you authorize, in an isolated environment</h3>
+                            <p>
+                                Cypture touches only the target you enter and never spills anywhere
+                                else. Every scan runs in its own single-use environment, isolated
+                                from the outside world, and once the job is done that environment is
+                                wiped completely. Your data stays with you.
+                            </p>
+                        </div>
+                        <div class="zz-visual"><div class="zz-mock zz-shield">⛨<span>only your target</span></div></div>
+                    </article>
+
+                    <article class="zz-row reveal reverse">
+                        <div class="zz-text">
+                            <span class="zz-eyebrow">06 · No hassle at all</span>
+                            <h3>Your only job is to type the target</h3>
+                            <p>
+                                No configuration, no setup, no interface to learn. You type the
+                                address, hit start, and lean back to watch. Cypture handles every
+                                remaining decision. When it's done, the results are waiting for you.
+                                It's that simple.
+                            </p>
+                        </div>
+                        <div class="zz-visual"><div class="zz-mock zz-ledger">
+                            <span>1 · type the target</span><span class="amber">2 · start and watch</span><span>3 · get the results</span>
+                        </div></div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="dash-section reveal">
+                <h2 class="section-title"><span class="idx">02</span> How It Works</h2>
+                <div class="steps">
+                    <article class="step-card framed">
+                        <div class="step-num">01</div>
+                        <h3>Type the Target</h3>
+                        <p>You type the address you want to test on a single line. That's all.</p>
+                    </article>
+                    <article class="step-card framed">
+                        <div class="step-num">02</div>
+                        <h3>Start</h3>
+                        <p>Cypture sets up its own approach and gets to work.</p>
+                    </article>
+                    <article class="step-card framed">
+                        <div class="step-num">03</div>
+                        <h3>Watch Live</h3>
+                        <p>You see every step in real time in your own terminal.</p>
+                    </article>
+                    <article class="step-card framed">
+                        <div class="step-num">04</div>
+                        <h3>Get the Results</h3>
+                        <p>Verified findings and a downloadable professional report.</p>
+                    </article>
+                </div>
+                <p class="dash-note"><b>⚠</b> Only use Cypture on systems you are authorized to test.</p>
+            </section>
+
+            <section class="cta-band framed reveal">
+                <h2>Type a target, watch the rest.</h2>
+                <p>Log in and start your first scan in minutes. Cypture explores, tries, proves, and explains. You just watch.</p>
+                <div class="hero-cta">
+                    <a class="btn btn-scan" href="/login"><span class="btn-icon">▶</span> LOG IN</a>
+                </div>
+            </section>
+        </main>
+
+        <footer id="app-footer">
+            <p>Cypture · Security Testing Console</p>
+        <p style="color:#ffb000;font-weight:600;letter-spacing:.02em">Cypture — open-source security scanning tool.</p>
+        <p style="color:#9a9a9a;font-size:11px;opacity:.75;margin-top:4px">⚠ Findings are AI-generated — don't trust results 100%, verify the output.</p>
+        </footer>
+        <div id="ai-disclaimer" style="position:fixed;bottom:4px;right:8px;z-index:99999;font-size:10px;color:#9a9a9a;opacity:.62;background:rgba(10,10,10,.45);padding:1px 7px;border-radius:6px;pointer-events:none;white-space:nowrap;letter-spacing:.02em">⚠ AI-generated · don't trust 100%, verify</div>
+
+        <script>
+            (function () {
+                var intro = document.getElementById("intro");
+                if (!intro) return;
+                // Play the intro (KNOCK KNOCK block wall) ONCE per session: if it already broke
+                // (e.g. going to login and coming BACK), don't show it again → remove the wall instantly, reveal the content.
+                var INTRO_SEEN = 'cyp_intro_seen';
+                try { if (sessionStorage.getItem(INTRO_SEEN) === '1') { intro.remove(); document.body.classList.remove('intro-active'); return; } } catch (e) { }
+                var ghost = document.getElementById("intro-ghost");
+                var pupils = ghost.querySelectorAll(".ghost-pupil");
+                var txt = intro.querySelector(".intro-text");
+                var wall = document.getElementById("intro-wall");
+                var sign = document.getElementById("wall-sign");
+                window.addEventListener("mousemove", function (e) {
+                    var r = ghost.getBoundingClientRect();
+                    var dx = e.clientX - (r.left + r.width / 2);
+                    var dy = e.clientY - (r.top + r.height / 2);
+                    var m = Math.hypot(dx, dy) || 1;
+                    var cell = ghost.offsetWidth / 11;
+                    var ox = (dx / m) * cell, oy = (dy / m) * cell;
+                    pupils.forEach(function (p) { p.style.transform = "translate(" + ox + "px," + oy + "px)"; });
+                }, { passive: true });
+                var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                function finish() {
+                    if (intro.classList.contains("done")) return;
+                    intro.classList.add("done");
+                    document.body.classList.remove("intro-active");
+                    setTimeout(function () { if (intro.parentNode) intro.remove(); }, 650);
+                }
+                if (reduce) { finish(); return; }
+                var vw = window.innerWidth, vh = window.innerHeight;
+                var T = Math.max(70, Math.round(Math.min(vw, vh) / 8));
+                var cols = Math.ceil(vw / T), rows = Math.ceil(vh / T);
+                var shades = ["#26262a", "#2c2c30", "#303034", "#28282c", "#323236", "#2a2a2e"];
+                var tiles = [];
+                for (var r = 0; r < rows; r++) {
+                    for (var c = 0; c < cols; c++) {
+                        var t = document.createElement("span");
+                        t.className = "wall-tile";
+                        t.style.left = c * T + "px"; t.style.top = r * T + "px";
+                        t.style.width = T + "px"; t.style.height = T + "px";
+                        t.style.background = shades[(r * 3 + c * 7) % shades.length];
+                        wall.appendChild(t);
+                        tiles.push({ el: t, x: c * T + T / 2, y: r * T + T / 2 });
+                    }
+                }
+                var cx = vw / 2, cy = vh / 2, half = Math.max(vw, vh) / 2;
+                function shatter() {
+                    var G = 2800, DUR = 1.5, STEPS = 7;
+                    tiles.forEach(function (tl) {
+                        var ddx = tl.x - cx, ddy = tl.y - cy;
+                        var dist = Math.hypot(ddx, ddy) || 1;
+                        var nx = ddx / dist, ny = ddy / dist;
+                        var nearC = 1 - Math.min(dist / half, 1);
+                        var speed = 130 + Math.random() * 240 + nearC * 260;
+                        var vx = nx * speed + (Math.random() - 0.5) * 180;
+                        var vy = ny * speed * 0.4 - (180 + Math.random() * 280 + nearC * 160);
+                        var rotV = (Math.random() * 2 - 1) * 460;
+                        var frames = [];
+                        for (var i = 0; i <= STEPS; i++) {
+                            var tt = (i / STEPS) * DUR;
+                            var X = vx * tt, Y = vy * tt + 0.5 * G * tt * tt;
+                            frames.push({ transform: "translate(" + X.toFixed(1) + "px," + Y.toFixed(1) + "px) rotate(" + (rotV * tt).toFixed(1) + "deg)" });
+                        }
+                        tl.el.animate(frames, { duration: DUR * 1000, delay: dist * 0.45, easing: "linear", fill: "forwards" });
+                    });
+                    setTimeout(function () { if (wall.parentNode) wall.remove(); }, 1900);
+                }
+                var started = false;
+                function go() {
+                    if (started) return;
+                    started = true;
+                    try { sessionStorage.setItem(INTRO_SEEN, '1'); } catch (e) { } // broke once → skip on return
+                    sign.style.cursor = "default";
+                    sign.animate([
+                        { transform: "translate(-50%,-50%) rotate(0deg)", opacity: 1 },
+                        { transform: "translate(-50%, 130vh) rotate(46deg)", opacity: 1 },
+                    ], { duration: 900, easing: "cubic-bezier(.4,0,.7,1)", fill: "forwards" });
+                    shatter();
+                    var grow = ghost.animate([
+                        { transform: "translate(-50%,-50%) scale(0.06)" },
+                        { transform: "translate(-50%,-50%) scale(0.3)", offset: 0.35 },
+                        { transform: "translate(-50%,-50%) scale(0.9)" },
+                    ], { duration: 2000, easing: "cubic-bezier(.5,0,.82,.42)", fill: "forwards" });
+                    grow.finished.then(function () {
+                        ghost.animate([
+                            { transform: "translate(-50%,-50%) scale(0.9)" },
+                            { transform: "translate(-50%,-50%) scale(0.98)" },
+                        ], { duration: 300, easing: "ease-out", fill: "forwards" });
+                        txt.classList.add("show");
+                        setTimeout(finish, 1450);
+                    }).catch(function () {});
+                }
+                intro.addEventListener("click", go);
+            })();
+        </script>
+        <script src="js/bg.js"></script>
+        <script src="js/logo.js"></script>
+        <script src="js/theme.js"></script>
+        <script>
+            (function () {
+                var els = document.querySelectorAll('.reveal');
+                if (!els.length) return;
+                // "Break" (reveal) the blocks once: if it already played this session (e.g. going to
+                // login and coming BACK), don't replay the animation → show them all revealed instantly.
+                var SEEN = 'cyp_reveal_seen', seen = false;
+                try { seen = sessionStorage.getItem(SEEN) === '1'; } catch (e) { }
+                if (seen || !('IntersectionObserver' in window)) { els.forEach(function (e) { e.classList.add('in'); }); return; }
+                var io = new IntersectionObserver(function (entries) {
+                    entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } });
+                }, { threshold: 0.18, rootMargin: '0px 0px -6% 0px' });
+                els.forEach(function (e) { io.observe(e); });
+                try { sessionStorage.setItem(SEEN, '1'); } catch (e) { }
+            })();
+        </script>
+        <script>
+            // Landing LIVE finding counter — fetches public /api/public/stats and refreshes every 15s.
+            (function () {
+                function fmt(n) { return (Number(n) || 0).toLocaleString('en-US'); }
+                function set(id, v) { var el = document.getElementById(id); if (el) el.textContent = fmt(v); }
+                function load() {
+                    fetch('/api/public/stats', { headers: { 'Accept': 'application/json' } })
+                        .then(function (r) { return r.ok ? r.json() : null; })
+                        .then(function (d) {
+                            if (!d) return;
+                            set('lc-total', d.total); set('lc-scans', d.scans);
+                            set('lc-crit', d.critical); set('lc-high', d.high);
+                            set('lc-med', d.medium); set('lc-low', d.low);
+                        })
+                        .catch(function () { });
+                }
+                load();
+                setInterval(load, 15000);
+            })();
+        </script>
+        <script>
+            // Auth-aware landing: if the user is ALREADY logged in, turn the login CTA into
+            // "OPEN CONSOLE" → returning to the home page shouldn't feel like logging in again.
+            (function () {
+                function getCookie(n) { var m = document.cookie.match('(^|;)\\s*' + n + '\\s*=\\s*([^;]+)'); return m ? m.pop() : ''; }
+                fetch('/api/auth/me', { credentials: 'same-origin' })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (d) {
+                        if (d && d.user) {
+                            // LOGGED IN: CTAs → "OPEN CONSOLE" pointing to /admin, add LOG OUT to the header.
+                            document.querySelectorAll('.hero-cta a[href="/login"]').forEach(function (a) {
+                                a.innerHTML = '<span class="btn-icon">▶</span> OPEN CONSOLE'; a.setAttribute('href', '/admin');
+                            });
+                            var hr = document.querySelector('.header-right');
+                            if (hr && !document.getElementById('landing-logout')) {
+                                var out = document.createElement('a');
+                                out.id = 'landing-logout'; out.className = 'admin-link'; out.href = '#'; out.textContent = 'LOG OUT';
+                                out.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': getCookie('cyp_csrf') } })
+                                        .then(function () { location.reload(); }).catch(function () { location.reload(); });
+                                });
+                                hr.appendChild(out);
+                            }
+                            document.body.classList.add('auth-in'); // header login link stays hidden via CSS
+                        } else {
+                            // LOGGED OUT: show the login button (flash guard: hidden by default, revealed here).
+                            document.body.classList.add('auth-out');
+                        }
+                    })
+                    .catch(function () { document.body.classList.add('auth-out'); });
+            })();
+        </script>
+    </body>
+</html>

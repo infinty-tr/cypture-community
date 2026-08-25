@@ -1,0 +1,30 @@
+# Cypture production edge — TLS termination + reverse proxy.
+#
+# Caddy obtains and renews a Let's Encrypt certificate for example.com automatically.
+# PREREQUISITES:
+#   1. DNS A record: example.com → this server's public IP.
+#   2. Inbound TCP 80 AND 443 reachable from the internet (Azure NSG + host firewall).
+#      80 is needed for the ACME HTTP challenge and to redirect to HTTPS.
+# The backend listens on 127.0.0.1:7777 (never exposed directly).
+#
+# setup.sh installs this to /etc/caddy/Caddyfile and reloads caddy.
+
+example.com {
+	encode zstd gzip
+
+	# WebSocket + normal HTTP both proxy transparently to the backend.
+	reverse_proxy 127.0.0.1:7777
+
+	# Caddy already sets sane TLS; the app emits its own HSTS/CSP/security headers,
+	# so we don't duplicate them here (avoids conflicting values).
+
+	log {
+		output file /var/log/caddy/cypture.access.log
+		format json
+	}
+}
+
+# Optional: redirect the apex-less/www host to the canonical domain.
+www.example.com {
+	redir https://example.com{uri} permanent
+}

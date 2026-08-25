@@ -1,0 +1,11 @@
+# OWASP Juice Shop — kasıtlı-zafiyetli referans uygulaması (tek konteyner).
+# Eval hedefi: çok sayıda bilinen sınıf (SQLi, XSS, broken auth, IDOR, sensitive data).
+# Çalıştır:  docker compose -f targets/juice-shop.yml up -d
+# Hedef URL:  http://127.0.0.1:3000
+services:
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    container_name: cyp-eval-juiceshop
+    ports:
+      - "3000:3000"
+    restart: unless-stopped

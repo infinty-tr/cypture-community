@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/svg+xml" href="/css/favicon.svg">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Cypture · Operator login.">
+    <meta name="theme-color" content="#0a0a09">
+    <title>Cypture · Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <script>
+        // Apply before paint to avoid a theme flash
+        (function () {
+            try {
+                var t = localStorage.getItem('cypture-theme') || 'dark';
+                document.documentElement.setAttribute('data-theme', t);
+            } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+        })();
+    </script>
+</head>
+<body class="login-body">
+    <canvas id="bg-canvas" data-chase="off"></canvas>
+    <div class="bg-grid"></div>
+    <div class="bg-scan"></div>
+    <div class="bg-vignette"></div>
+
+    <button id="theme-toggle" class="theme-toggle login-theme" type="button" aria-label="Switch to light theme">LIGHT</button>
+    <a href="/" class="admin-link login-back" aria-label="Back to home">← BACK</a>
+
+    <main class="login-wrap">
+        <section class="login-box prompt-container framed">
+            <p class="login-welcome">WELCOME&nbsp;TO</p>
+
+            <span class="logo logo-anim logo-xl" aria-label="CYPTURE">
+                <span class="ll">C</span><span class="ll">Y</span><span class="ll">P</span><span class="ll ac">T</span><span class="ll ac">U</span><span class="ll ac">R</span><span class="ll ac">E</span>
+                <span class="logo-pac" aria-hidden="true"></span>
+            </span>
+
+            <form class="login-form" id="login-form" autocomplete="off" novalidate>
+                <label class="login-field">
+                    <span class="login-label">Email</span>
+                    <input class="login-input" type="email" id="login-user" placeholder="you@company.com" spellcheck="false" autocomplete="email" required>
+                </label>
+                <label class="login-field">
+                    <span class="login-label">Password</span>
+                    <input class="login-input" type="password" id="login-pass" placeholder="••••••••••" autocomplete="current-password" required>
+                </label>
+                <label class="legal-consent" style="display:flex;gap:9px;align-items:flex-start;margin:2px 0 6px;font-size:12.5px;line-height:1.5;color:var(--muted,#b9b4a8);cursor:pointer">
+                    <input type="checkbox" id="login-consent" style="margin-top:3px;accent-color:#ffb000;flex:0 0 auto;width:16px;height:16px">
+                    <span>I have read and accept the <a href="#" data-legal="aydinlatma" style="color:#ffb000;text-decoration:underline">Privacy Notice</a> and the <a href="#" data-legal="kosullar" style="color:#ffb000;text-decoration:underline">Terms of Use &amp; Disclaimer</a>.</span>
+                </label>
+                <button class="btn btn-scan login-submit" type="submit">
+                    <span class="btn-icon">▶</span><span class="btn-text">LOG IN</span>
+                </button>
+                <p class="login-msg" id="login-msg" role="alert"></p>
+            </form>
+
+            <p class="login-foot">Cypture · Security Testing Console</p>
+            <p class="login-legal" style="font-size:11.5px;color:var(--muted,#8a867c);margin:4px 0 0">
+                <a href="#" data-legal="aydinlatma" style="color:#ffb000;text-decoration:underline">Privacy Notice</a>
+                &nbsp;·&nbsp;
+                <a href="#" data-legal="kosullar" style="color:#ffb000;text-decoration:underline">Terms of Use &amp; Disclaimer</a>
+            </p>
+        <p style="color:#ffb000;font-weight:600;letter-spacing:.02em">Cypture — open-source security scanning tool.</p>
+        </section>
+    </main>
+
+    <script>
+        (function () {
+            var form = document.getElementById('login-form');
+            var msg = document.getElementById('login-msg');
+
+            form.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                var u = document.getElementById('login-user');
+                var p = document.getElementById('login-pass');
+                if (!u.value.trim() || !p.value) {
+                    msg.textContent = 'Email and password are required.';
+                    msg.classList.add('error');
+                    (!u.value.trim() ? u : p).classList.add('shake');
+                    setTimeout(function () { u.classList.remove('shake'); p.classList.remove('shake'); }, 450);
+                    return;
+                }
+                var consent = document.getElementById('login-consent');
+                if (!consent || !consent.checked) {
+                    msg.textContent = 'You must accept the privacy notice and terms of use to continue.';
+                    msg.classList.add('error');
+                    var cw = consent && consent.closest('.legal-consent');
+                    if (cw) { cw.classList.add('shake'); setTimeout(function () { cw.classList.remove('shake'); }, 450); }
+                    return;
+                }
+                var btn = form.querySelector('.login-submit');
+                btn.classList.add('scanning');
+                msg.classList.remove('error');
+                msg.textContent = 'Authenticating…';
+                try {
+                    var res = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: u.value.trim(), password: p.value }),
+                    });
+                    var data = await res.json().catch(function () { return {}; });
+                    if (!res.ok) throw new Error(data.error || 'Login failed.');
+                    msg.textContent = 'Login successful · redirecting…';
+                    window.location.href = data.redirect || '/admin';
+                } catch (err) {
+                    btn.classList.remove('scanning');
+                    msg.classList.add('error');
+                    msg.textContent = err.message;
+                    p.classList.add('shake');
+                    setTimeout(function () { p.classList.remove('shake'); }, 450);
+                }
+            });
+        })();
+    </script>
+    <script src="js/bg.js"></script>
+    <script src="js/logo.js"></script>
+    <script src="js/theme.js"></script>
+    <script src="js/legal.js"></script>
+</body>
+</html>

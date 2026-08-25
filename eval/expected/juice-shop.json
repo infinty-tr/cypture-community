@@ -1,0 +1,18 @@
+{
+  "target": "127.0.0.1:3000",
+  "note": "OWASP Juice Shop'ta beklenen zafiyet SINIFLARI (ground-truth). Skorlama, bulunan bulguların vuln_type/title/endpoint alanlarını bu anahtar kelimelerle eşler.",
+  "expected_classes": [
+    { "class": "sqli",            "match": ["sql", "sqli", "injection.*sql"], "min_severity": "high",
+      "hint": "Login bypass: ' OR 1=1-- email alanında" },
+    { "class": "xss",             "match": ["xss", "cross-site script"],      "min_severity": "medium",
+      "hint": "Reflected/DOM XSS: arama (q) parametresi" },
+    { "class": "broken_auth",     "match": ["auth", "login bypass", "jwt", "session"], "min_severity": "high",
+      "hint": "Zayıf JWT / oturum / parola politikası" },
+    { "class": "idor_bola",       "match": ["idor", "bola", "broken object", "access control", "yetkisiz eriş"], "min_severity": "high",
+      "hint": "Basket/order/feedback başka kullanıcı id ile erişim" },
+    { "class": "sensitive_data",  "match": ["sensitive", "exposure", "ftp", "backup", "info disclosure", "veri sızıntı"], "min_severity": "medium",
+      "hint": "/ftp dizini, yedek dosyaları, hata mesajlarında sızıntı" },
+    { "class": "mass_assignment", "match": ["mass assignment", "isadmin", "role"], "min_severity": "high",
+      "hint": "Kayıt/güncelleme isteğine role/isAdmin enjekte" }
+  ]
+}

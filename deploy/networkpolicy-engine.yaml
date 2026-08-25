@@ -1,0 +1,52 @@
+# Cypture engine egress backstop (C1).
+#
+# Every per-scan engine Pod carries label app=cypture-engine. Bash tools inside the
+# pod (curl / nuclei / sqlmap / ffuf …) egress DIRECTLY, bypassing the MITM scope
+# proxy — so this network-layer policy, not the proxy, is what actually contains
+# SSRF. It blocks the pod from reaching cloud metadata / IMDS (169.254.0.0/16, Azure
+# WireServer 168.63.129.16), RFC1918 internal ranges, and the cluster network, while
+# leaving public targets reachable. DNS (:53) stays allowed so targets resolve.
+#
+# The backend (k8s runner) also applies an equivalent policy programmatically before
+# each pod; this file is the always-on static backstop applied by setup.sh, and lets
+# you verify/adjust it by hand.
+#
+# REQUIRES a NetworkPolicy controller. k3s ships kube-router (enforces these) unless
+# started with --disable-network-policy. Verify:
+#   sudo iptables -L | grep -qi kube-router && echo "NetworkPolicy enforced" || echo "NO enforcement"
+#
+# Apply:  kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml apply -f deploy/networkpolicy-engine.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cypture-engine-egress
+  namespace: default
+  labels:
+    app: cypture-engine
+spec:
+  podSelector:
+    matchLabels:
+      app: cypture-engine
+  policyTypes:
+    - Egress
+  egress:
+    # 1) DNS to any resolver (CoreDNS lives in the cluster CIDR that rule 2 blocks;
+    #    NetworkPolicy egress rules are additive, so :53 stays allowed).
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # 2) Everything else: public internet only. Metadata + internal ranges excluded.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16   # link-local + cloud metadata (IMDS)
+              - 168.63.129.16/32 # Azure WireServer / DNS
+              - 10.0.0.0/8       # RFC1918 + cluster pod/service CIDR
+              - 172.16.0.0/12    # RFC1918
+              - 192.168.0.0/16   # RFC1918
+              - 100.64.0.0/10    # CGNAT
