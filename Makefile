@@ -5,6 +5,7 @@ run:
 
 build:
 	go build -o bin/cypture ./cmd/cypture
+	go build -o bin/cypture-engine ./cmd/cypture-engine
 
 vet:
 	go vet ./...

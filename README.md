@@ -79,6 +79,10 @@ Docker/Kubernetes runners. Bring your own LLM provider key and model.
 - For real scans: **Docker** or a **Kubernetes (k3s)** cluster, an **LLM provider API
   key**, and a **compatible agent‑runtime binary** (see the note above).
 - `openssl`, `jq`, `sqlite3`, `curl` for the setup script.
+- **For the `live` runner (real scans), install the recon toolchain on PATH:**
+  **`subfinder`** and **`httpx`** are **required** (the agent's `preflight.sh`
+  aborts without them); `gau`, `katana`, `waybackurls`, `hakrawler`, `ffuf`,
+  and `amass` are optional (fallbacks kick in when absent).
 
 ---
 
