@@ -3,6 +3,10 @@
 Hedefin teknoloji+sürümü tespit edildiğinde **jenerik sınıf testiyle yetinme** — o ürün/sürüme ait
 BİLİNEN CVE'leri imzayla test et. En yüksek-etkili (genelde RCE/auth-bypass) açıklar burada saklı.
 
+> ⛔ BLACKBOX: CVE'yi **canlı hedefte** `cyp_send_request` ile imzala/doğrula (ürüne-özel yol, hata
+> imzası, payload). Upstream kaynağı OKUMA / repo KLONLAMA / GitHub-NVD'ye curl-webfetch YAPMA —
+> parmak izi bilgin (Server/sürüm/yol) yeterli; kanıtı canlı endpoint üretir.
+
 ## AKIŞ
 1. **Parmak izi:** `Server`/`X-Powered-By`/`X-AspNet-Version` başlıkları, hata sayfaları, ürün-özel yollar (`/Telerik.Web.UI.WebResource.axd`, `/_layouts/`, `/struts2-showcase/`), JS/asset sürümleri, `httpx -tech-detect` çıktısı.
 2. **Eşle:** tespit edilen ürün+sürümü bilinen CVE'lerle eşle (aşağıdaki yüksek-değer tablo + genel mantık).

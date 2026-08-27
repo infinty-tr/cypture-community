@@ -20,11 +20,13 @@ if [ -n "$PLAYBOOK" ]; then
 ZORUNLU İLK İŞ: \`read $PLAYBOOK\` (seçili sözleşmeler + zafiyet playbook'ları) — OKU ve UYGULA, özetini YAZMA. Kendi genel bilgine değil ona göre: sink → baseline → kademeli prob → kanıt kapısı → varyant → durma.
 BULGU KAYIT — ZORUNLU, HER TEYİTTE ANINDA (kusursuz exploit zincirini BEKLEME, teyitli ARA bulgu da): bir zafiyeti DOĞRULAR DOĞRULAMAZ çıktına TEK satır şu işareti yaz → [CYP-FINDING]{\"title\":\"...\",\"severity\":\"critical|high|medium|low|info\",\"vuln_type\":\"...\",\"endpoint\":\"...\",\"method\":\"...\",\"evidence\":\"...\",\"poc\":\"...\",\"confidence\":\"confirmed|likely\",\"verified\":true} — bu işaret TEK BAŞINA bulguyu panele düşürür (tool çağırmasan/dosya yazmasan BİLE; en sağlam kanal). Marker yazmadıysan bulgu YOK demektir; ASLA sadece anlatıp 'yazdım' deyip geçme. Ayrıca cyp_create_finding çağır + /cyp/findings.ndjson'a aynı JSON'u ekle.
 PoC = MOTORDAN GEÇEN GERÇEK KANIT (düz 'şunu yaptım' anlatımı YETERSİZ): zafiyeti cyp_send_request ile fiilen SÖMÜR (istek kaydolsun) → yanıtta GÖRÜNEN gerçek veriyi (dosya içeriği, DB satırı, sürüm, komut çıktısı, başkasının verisi) extracted_evidence'a yaz + proof_kind=extracted_data|executed_effect; diferansiyel için cyp_set_baseline+cyp_diff_requests kullan. Motor bu extracted_evidence'ı KAYITLI yanıtta arar — uydurursan/yanıtta yoksa 'doğrulandı' VERİLMEZ. Her bulgu request+response taşımalı.
+⛔ BLACKBOX — SADECE CANLI HEDEF: repo KLONLAMA (git clone), OSS kaynak kodu indirme/grep'leme, GitHub/GitLab/pkg.go.dev/NVD'ye kod okumak için curl/webfetch/web araştırması YASAK. Hedefi ('ezBookkeeping', 'WordPress' vb.) tanıman kaynağa bakma sebebi DEĞİL — cyp_send_request ile CANLI test etme sebebidir; bilinen açığın KANITINI canlı endpoint'te üret (kaynağı okuyarak değil). bash yalnız scripts/* yardımcıları, crt.sh recon ve 'curl -x http://127.0.0.1:8080' (hedefe proxy) içindir; başka amaçla git/curl-to-github/python-source KULLANMA.
 
 ${PROMPT}"
   echo "skill-inject: ${AGENT} → 'read $PLAYBOOK' direktifi (gömme yok, prompt küçük)" >&2
 else
   PROMPT="BULGU MARKER: recon sırasında bir zafiyeti DOĞRULARSAN (LFI/XSS/SQLi/SSRF vb.) çıktına TEK satır yaz → [CYP-FINDING]{\"title\":\"...\",\"severity\":\"high\",\"vuln_type\":\"...\",\"endpoint\":\"...\",\"poc\":\"...\",\"verified\":true}; bu olmadan bulgu panele DÜŞMEZ, sadece anlatma.
+⛔ BLACKBOX — SADECE CANLI HEDEF: repo KLONLAMA (git clone), OSS kaynak kodu indirme/grep'leme, GitHub/GitLab/pkg.go.dev/NVD'ye kod okumak için curl/webfetch YASAK. Hedefi tanıman kaynağa bakma değil cyp_send_request ile CANLI test sebebidir. bash yalnız scripts/* + crt.sh recon + 'curl -x http://127.0.0.1:8080' içindir.
 
 ${PROMPT}"
   echo "skill-inject: ${AGENT} → finding-marker (playbook yok)" >&2

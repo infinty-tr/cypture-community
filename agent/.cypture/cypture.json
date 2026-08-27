@@ -12,5 +12,20 @@
       },
       "enabled": true
     }
+  },
+  "tools": {
+    "webfetch": false
+  },
+  "permission": {
+    "webfetch": "deny",
+    "bash": {
+      "git *": "deny",
+      "git clone*": "deny",
+      "curl *github*": "deny",
+      "curl *githubusercontent*": "deny",
+      "curl *gitlab*": "deny",
+      "wget *github*": "deny",
+      "*": "allow"
+    }
   }
 }

@@ -4,10 +4,17 @@ mode: all
 cypture: true
 permission:
   edit: allow
-  bash: allow
-  read: allow
-  glob: allow
-  grep: allow
+  webfetch: deny
+  bash:
+    "git *": deny
+    "git clone*": deny
+    "curl *github*": deny
+    "curl *githubusercontent*": deny
+    "curl *gitlab*": deny
+    "wget *github*": deny
+    "*": allow
+tools:
+  webfetch: false
 ---
 
 # 🕵️ RECON AGENT — DERİN SEMANTİK KEŞİF AJANI

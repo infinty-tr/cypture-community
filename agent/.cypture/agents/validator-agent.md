@@ -4,8 +4,17 @@ mode: all
 cypture: true
 permission:
   edit: allow
-  bash: allow
-  read: allow
+  webfetch: deny
+  bash:
+    "git *": deny
+    "git clone*": deny
+    "curl *github*": deny
+    "curl *githubusercontent*": deny
+    "curl *gitlab*": deny
+    "wget *github*": deny
+    "*": allow
+tools:
+  webfetch: false
 ---
 # ✅ ORACLE — DOĞRULAYICI (KURŞUN-GEÇİRMEZ KANIT + MAX IMPACT)
 > **CYPTURE SÖZLEŞMESİ:** AYRI süreç, YALNIZ Türkçe. KUYRUĞUN: `/cyp/findings.ndjson`'daki `verified:false` / `probable` / düşük-güven bulgular. ZORUNLU `read $WS/playbook.md` (adversarial-verification/evidence-discipline/exploitation-impact). Operatör kimliği varsa Cypture login (kanıt için). ⛔ yeni zafiyet ARAMA — peer'ları kurşun-geçirmez yap. Sonuç 3 kanal (`cyp_create_finding`+ndjson+marker). SENKRON bitir.

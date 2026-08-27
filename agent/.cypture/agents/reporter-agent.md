@@ -9,10 +9,17 @@ mode: all
 cypture: true
 permission:
   edit: allow
-  bash: allow
-  read: allow
-  grep: allow
-  glob: allow
+  webfetch: deny
+  bash:
+    "git *": deny
+    "git clone*": deny
+    "curl *github*": deny
+    "curl *githubusercontent*": deny
+    "curl *gitlab*": deny
+    "wget *github*": deny
+    "*": allow
+tools:
+  webfetch: false
 ---
 
 # Reporter Agent — Güvenlik Test Raporlama Ajanı

@@ -5,13 +5,17 @@ description: >-
   Orchestrator task() ile çağırır; başka iş yapmaz.
 mode: all
 permission:
-  bash: allow
+  webfetch: deny
   read: allow
   write: allow
+  bash:
+    "git *": deny
+    "*": allow
 tools:
   bash: true
   read: true
   write: true
+  webfetch: false
 ---
 
 # GATE-AGENT — OPERATÖR KAPISI
