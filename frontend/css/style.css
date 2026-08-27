@@ -401,7 +401,7 @@ body::before {
 
 .feed-line { display: flex; gap: 12px; padding: 2px 0; animation: inq 0.18s ease; }
 .feed-ts { color: var(--text-3); flex-shrink: 0; font-size: 0.66rem; min-width: 58px; padding-top: 2px; }
-.feed-body { min-width: 0; flex: 1; word-break: break-word; }
+.feed-body { min-width: 0; flex: 1; word-break: break-word; overflow-wrap: anywhere; }
 .feed-body .md-body { font-size: inherit; line-height: 1.55; margin: 2px 0; }
 .feed-rep { color: var(--amber-2); font-weight: 700; font-size: 0.86em; opacity: 0.9; }
 .feed-body .md-body .md-h { margin: 6px 0 4px; }
@@ -449,6 +449,21 @@ body.cockpit #app-header, body.cockpit .cyp-nav { flex: 0 0 auto; }
 body.cockpit #app-footer { display: none; }
 body.cockpit #app-main { max-width: none; padding: 14px 18px 16px; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 body.cockpit #view-live { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+/* The cockpit panel must stretch to fill the view, or the grid collapses to
+   ~content height and looks cramped/tiny before any agent has streamed. */
+body.cockpit #live-cockpit.live-panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+body.cockpit #live-terminal.live-panel { flex: 1 1 auto; min-height: 0; }
+
+/* Cockpit / Terminal toggle — themed (were unstyled → default white buttons). */
+.live-toggle { display: flex; gap: 6px; margin: 4px 0 2px; }
+.lt-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px;
+    font-family: var(--mono); font-size: 0.68rem; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--text-3); background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: 7px; cursor: pointer;
+    transition: color .15s, border-color .15s, background .15s; }
+.lt-btn:hover { color: var(--text); border-color: var(--text-3); }
+.lt-btn.active { color: #000; background: var(--amber); border-color: var(--amber);
+    box-shadow: 0 0 12px var(--amber-glow, rgba(255,176,32,0.35)); }
 
 #view-live .live-readout { display: flex; gap: 16px; align-items: center; margin-right: 6px; }
 #view-live .lr-cell { display: flex; flex-direction: column; line-height: 1.1; font-family: var(--mono); }
@@ -473,7 +488,7 @@ body.cockpit #view-live { display: flex; flex-direction: column; min-height: 0; 
 
 .cockpit-grid .agent-grid { margin-top: 0; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); align-content: start; }
 .cockpit-grid .agent-tile { min-height: 190px; }
-.cockpit-grid .agent-tile-body { max-height: none; flex: 1; }
+.cockpit-grid .agent-tile-body { max-height: min(46vh, 460px); overflow-y: auto; overflow-x: hidden; flex: none; }
 
 .ck-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); min-height: 0; }
 .ck-system .terminal-feed { max-height: none; }

@@ -64,10 +64,18 @@ func (s *Server) handleScanEvents(w http.ResponseWriter, r *http.Request) {
 	s.DB.Where("scan_session_id = ?", sess.ID).Order("seq asc").Find(&events)
 	out := make([]map[string]any, 0, len(events))
 	for _, e := range events {
-		out = append(out, map[string]any{
+		m := map[string]any{
 			"seq": e.Seq, "level": e.Level, "category": e.Category,
 			"module": e.Module, "message": e.Message,
-		})
+		}
+		// Carry pane routing so a REST replay lands events in the correct
+		// agent lane, consistent with the WebSocket replay shape.
+		if e.PaneID != "" {
+			m["data"] = map[string]any{
+				"pane_id": e.PaneID, "pane_module": e.PaneModule, "pane_status": e.PaneStatus,
+			}
+		}
+		out = append(out, m)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"events": out})
 }

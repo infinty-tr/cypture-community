@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -uo pipefail
-STATE=/cyp/state.json
+STATE=${CYP_FEED_DIR:-/cyp}/state.json
 cmd="${1:-}"; wave="${2:-}"; note="${3:-}"
 command -v jq >/dev/null || exit 0
 [ -f "$STATE" ] || echo '{"waves":[],"updated":0}' > "$STATE" 2>/dev/null || exit 0
 TS=$(date +%s)
-FCNT=$([ -f /cyp/findings.ndjson ] && grep -c '"title"' /cyp/findings.ndjson 2>/dev/null || echo 0)
+FCNT=$([ -f ${CYP_FEED_DIR:-/cyp}/findings.ndjson ] && grep -c '"title"' ${CYP_FEED_DIR:-/cyp}/findings.ndjson 2>/dev/null || echo 0)
 case "$cmd" in
   record)
     jq --arg w "$wave" --arg n "$note" --argjson ts "$TS" --argjson fc "${FCNT:-0}" \

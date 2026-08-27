@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+#
+# opencode-shim — adapt an opencode install to Cypture's agent-runtime contract.
+#
+# Cypture's `live` runner invokes CYPTURE_AGENT_BIN as `cypture-agent` with
+# Claude-Code-style flags (see internal/orchestrator/agentrunner.go and
+# agent/scripts/spawn_agent.sh). This shim maps those to opencode's flags and
+# forwards everything else unchanged.
+#
+# Install:
+#   cp scripts/opencode-shim /usr/local/bin/cypture-agent   # or anywhere on PATH
+#   chmod +x /usr/local/bin/cypture-agent
+#   # then point CYPTURE_AGENT_BIN at it (or name it `cypture-agent` on PATH).
+#
+# Override the opencode binary location with OPENCODE_BIN if it is not on PATH
+# (e.g. under systemd, where ~/.local/bin is usually absent):
+#   OPENCODE_BIN=/home/you/.local/bin/opencode
+set -euo pipefail
+
+resolve_opencode() {
+  if [ -n "${OPENCODE_BIN:-}" ] && [ -x "${OPENCODE_BIN}" ]; then
+    printf '%s\n' "${OPENCODE_BIN}"; return 0
+  fi
+  if command -v opencode >/dev/null 2>&1; then
+    command -v opencode; return 0
+  fi
+  local c
+  for c in "$HOME/.local/bin/opencode" "$HOME/.opencode/bin/opencode" \
+           /usr/local/bin/opencode /opt/opencode/bin/opencode; do
+    [ -x "$c" ] && { printf '%s\n' "$c"; return 0; }
+  done
+  echo "opencode-shim: opencode binary not found (set OPENCODE_BIN)" >&2
+  return 127
+}
+
+OPENCODE="$(resolve_opencode)"
+
+args=()
+for a in "$@"; do
+  case "$a" in
+    --dangerously-skip-permissions) args+=("--auto") ;;
+    *) args+=("$a") ;;
+  esac
+done
+
+exec "$OPENCODE" "${args[@]}"

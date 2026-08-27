@@ -62,3 +62,6 @@ pyghidra_mcp_projects/
 agent/.omo/
 agent/.cypture/plugin/ACTIVE_TARGET
 /tmp/opencode/
+
+# opencode/omo runtime session state (root-level)
+.omo/

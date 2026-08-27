@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -26,6 +27,14 @@ type ocEvent struct {
 			Title  string         `json:"title"`
 		} `json:"state"`
 	} `json:"part"`
+	Error struct {
+		Name    string `json:"name"`
+		Message string `json:"message"`
+		Data    struct {
+			Message string `json:"message"`
+			Ref     string `json:"ref"`
+		} `json:"data"`
+	} `json:"error"`
 }
 
 func (AgentRunner) Run(ctx context.Context, spec RunSpec, ctrl Controller) error {
@@ -50,12 +59,56 @@ func (AgentRunner) Run(ctx context.Context, spec RunSpec, ctrl Controller) error
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = spec.AgentDir
 
+	// Feed directory — the host-mode equivalent of the container's /cyp bridge.
+	// spawn_agent.sh drops each specialist's NDJSON stream into <feed>/agents,
+	// the engine writes traffic/feed here, and findings land in
+	// <feed>/findings.ndjson. The Go side tails all of it to build the cockpit.
+	feedDir := strings.TrimSpace(spec.WorkDir)
+	if feedDir == "" {
+		if d, err := os.MkdirTemp("", "cyp-feed-"+sanitize(spec.ScanID)); err == nil {
+			feedDir = d
+			defer os.RemoveAll(d)
+		}
+	}
+	agentsDir := ""
+	if feedDir != "" {
+		agentsDir = filepath.Join(feedDir, "agents")
+		if err := os.MkdirAll(agentsDir, 0o755); err != nil {
+			ctrl.Emit(Event{Level: LevelWarning, Category: CatSystem, Module: "Çekirdek",
+				Message: "Could not create the scan feed directory (" + Scrub(err.Error()) +
+					"); specialist agent panes may not appear."})
+			agentsDir = ""
+		}
+		if len(spec.KBSeed) > 0 {
+			_ = os.WriteFile(filepath.Join(feedDir, "kb.json"), spec.KBSeed, 0o644)
+		}
+	}
+
 	env := append(os.Environ(),
 		"CYP_MODE="+spec.Mode,
 		"CYP_TARGET="+spec.Target,
 		"CYP_SCOPE_INCLUDES="+strings.Join(spec.ScopeHosts, ","),
 		"CYP_SCOPE_EXCLUDES="+strings.Join(spec.ScopeExcludes, ","),
 	)
+	if feedDir != "" {
+		// CYP_FEED_DIR / CYP_PROJECT_ROOT let the agent scripts (spawn_agent.sh,
+		// gate-agent.sh, …) run on the host instead of the container's fixed
+		// /cyp and /agent paths; both default to the container values if unset.
+		env = append(env,
+			"CYP_FEED_DIR="+feedDir,
+			"CYP_PROJECT_ROOT="+spec.AgentDir,
+			"WS="+feedDir,
+			"CYP_FEED_PATH="+filepath.Join(feedDir, "feed.jsonl"),
+			"CYP_TRAFFIC_PATH="+filepath.Join(feedDir, "traffic.ndjson"),
+		)
+	}
+	// spawn_agent.sh spawns each specialist with this binary. On the host it is
+	// the opencode shim (not a literal `cypture-agent` on PATH), so hand it the
+	// resolved path explicitly, or specialists die with "command not found".
+	env = append(env, "CYP_AGENT_BIN="+bin)
+	if spec.SkipPerms {
+		env = append(env, "CYP_SKIP_PERMS=1")
+	}
 	if spec.Model != "" {
 		env = append(env, "CYP_MODEL="+spec.Model)
 	}
@@ -70,17 +123,63 @@ func (AgentRunner) Run(ctx context.Context, spec RunSpec, ctrl Controller) error
 	}
 	cmd.Env = env
 
+	// Group sub-agent activity into cockpit panes/lanes, exactly like the
+	// docker/k8s runners do (see docker.go). Without this, every event is
+	// classified as "system" and the specialist-agent grid stays empty.
+	ctrl = withPanes(ctrl)
+
 	ctrl.Emit(Event{Level: LevelSystem, Category: CatSystem, Module: "Çekirdek",
 		Message: "Scan core started; mapping the target surface."})
 
 	ctrl, stopHB, _ := withHeartbeat(ctx, ctrl)
 	defer stopHB()
 
-	return streamNDJSON(ctx, cmd, ctrl, nil)
+	// Tail the feed exactly like the container runners, so specialist
+	// sub-agents, findings and traffic surface in the live cockpit.
+	if feedDir != "" {
+		go tailFeed(ctx, filepath.Join(feedDir, "feed.jsonl"), ctrl)
+		go tailFindings(ctx, filepath.Join(feedDir, "findings.ndjson"), ctrl)
+		go tailTraffic(ctx, filepath.Join(feedDir, "traffic.ndjson"), ctrl)
+		go tailQuestions(ctx, feedDir, ctrl)
+		if agentsDir != "" {
+			go tailAgents(ctx, agentsDir, ctrl)
+		}
+	}
+
+	err := streamNDJSON(ctx, cmd, ctrl, nil)
+
+	if feedDir != "" {
+		importFindingsJSON(feedDir, ctrl)
+		importKBUpdate(feedDir, ctrl)
+	}
+	return err
 }
 
 func mapEvents(ev ocEvent, dispatched map[string]bool) []Event {
 	switch ev.Type {
+	case "error":
+		// opencode emits {"type":"error","error":{"name":...,"data":{"message":...}}}
+		// on provider/model failures. Without this case the failure is invisible and
+		// the cockpit just shows an empty, silently-dead agent.
+		msg := strings.TrimSpace(ev.Error.Data.Message)
+		if msg == "" {
+			msg = strings.TrimSpace(ev.Error.Message)
+		}
+		name := strings.TrimSpace(ev.Error.Name)
+		full := strings.TrimSpace(strings.TrimPrefix(name+": "+msg, ": "))
+		if strings.TrimSpace(strings.TrimSuffix(full, ":")) == "" {
+			return nil
+		}
+		if ref := strings.TrimSpace(ev.Error.Data.Ref); ref != "" {
+			full += " (" + ref + ")"
+		}
+		if fatal, ok := classifyFatal(full); ok {
+			return []Event{{Level: LevelError, Category: CatSystem, Module: "Çekirdek",
+				Message: fatal}}
+		}
+		return []Event{{Level: LevelWarning, Category: CatSystem, Module: "Çekirdek",
+			Message: "⚠ Agent error — " + Scrub(clip(full, 400))}}
+
 	case "text", "reasoning":
 		txt := strings.TrimSpace(ev.Part.Text)
 		if txt == "" {
@@ -309,6 +408,17 @@ func describeTool(tool string, input map[string]any, title string) string {
 	}
 	if q := firstString(input, "query"); q != "" {
 		return "Querying traffic: " + clip(q, 120)
+	}
+	if t == "bash" {
+		// Don't dump raw multi-line shell (echo/ls/heredoc floods) into the
+		// cockpit — collapse to a short, single-line summary.
+		if cmd := firstString(input, "command", "cmd", "script"); cmd != "" {
+			return "$ " + clip(oneLine(cmd), 120)
+		}
+		if title != "" {
+			return clip(oneLine(title), 120)
+		}
+		return "Running a local task."
 	}
 	if title != "" {
 		return clip(title, 160)

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -u
-AGENTS_DIR=/cyp/agents
+AGENTS_DIR="${CYP_FEED_DIR:-/cyp}/agents"
 INTERVAL="${CYP_REAPER_INTERVAL:-30}"      # tarama periyodu (sn)
 STALL_TTL="${CYP_REAPER_STALL_TTL:-900}"   # canlı-ama-sessiz eşiği (sn); 0 = (b)'yi kapat
-LOG=/cyp/reaper.log
+LOG="${CYP_FEED_DIR:-/cyp}/reaper.log"
 mkdir -p "$AGENTS_DIR" 2>/dev/null || true
 
 log() { echo "[$(date -u +%H:%M:%S)] $*" >> "$LOG" 2>/dev/null || true; }

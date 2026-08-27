@@ -2,7 +2,7 @@
 set -uo pipefail
 SURF="${1:-${WS:-.}/surface.json}"
 URLS="${WS:-.}/urls.txt"
-FIND="/cyp/findings.ndjson"
+FIND="${CYP_FEED_DIR:-/cyp}/findings.ndjson"
 blob=""
 [ -s "$SURF" ] && blob+=" $(cat "$SURF" 2>/dev/null)"
 [ -s "$URLS" ] && blob+=" $(cat "$URLS" 2>/dev/null)"

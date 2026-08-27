@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-AGENTS_DIR=/cyp/agents
+AGENTS_DIR="${CYP_FEED_DIR:-/cyp}/agents"
 
 MAX_WAIT="${CYP_AGENT_WAIT_MAX:-1500}"   # seconds (~25 min)
 START=$(date +%s)

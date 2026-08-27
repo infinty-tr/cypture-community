@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -uo pipefail
-AGENTS_DIR=/cyp/agents
+AGENTS_DIR="${CYP_FEED_DIR:-/cyp}/agents"
 MAX="${1:-${CYP_GATE_MAX_WAIT:-1800}}"
 START=$(date +%s)
 

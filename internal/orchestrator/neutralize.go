@@ -140,3 +140,9 @@ func clip(s string, n int) string {
 	}
 	return string(r[:n]) + "…"
 }
+
+// oneLine collapses whitespace/newlines into single spaces so a multi-line
+// shell command renders as one readable cockpit line.
+func oneLine(s string) string {
+	return strings.Join(strings.Fields(s), " ")
+}

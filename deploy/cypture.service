@@ -1,0 +1,28 @@
+[Unit]
+Description=Cypture Community Edition — web backend
+Documentation=https://github.com/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__RUN_USER__
+# WorkingDirectory MUST be the app root: the frontend is served from ./frontend
+# and the agent scripts/prompts are resolved relative to ./agent .
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=__APP_DIR__/.env
+# The `live` runner execs the agent runtime (opencode via the shim) and its
+# node/bun toolchain, which are usually under a user prefix that systemd does
+# not put on PATH. Extend PATH here (and/or set OPENCODE_BIN in .env).
+Environment=PATH=__APP_DIR__/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:__HOME__/.local/bin:__HOME__/.local/share/mise/shims
+ExecStart=__APP_DIR__/bin/cypture
+Restart=on-failure
+RestartSec=3
+# Hardening — relax if your runner needs more (the docker runner needs the
+# docker socket; the k8s runner needs kubeconfig access).
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

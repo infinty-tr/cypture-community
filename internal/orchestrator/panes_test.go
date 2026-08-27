@@ -55,3 +55,42 @@ func TestPaneClassifyPhaseFlow(t *testing.T) {
 		t.Fatalf("heartbeat routed to %q, want system", idHB)
 	}
 }
+
+// A lane-tagged event (as produced by tailAgentFile for a spawned specialist)
+// must be routed into its own cockpit pane, not the shared system feed. This is
+// the core of "agents showing up in the cockpit" for the live runner.
+func TestWithPanes_LaneTaggedEventGetsPane(t *testing.T) {
+	cap := &captureCtrl{}
+	ctrl := withPanes(cap)
+
+	ctrl.Emit(Event{Level: LevelThought, Category: CatPlanning, Module: "Akıl Yürütme",
+		Lane: "GHOST · Keşif", Message: "recon running"})
+
+	if len(cap.events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(cap.events))
+	}
+	d := cap.events[0].Data
+	if d == nil || d["pane_id"] == nil || d["pane_id"] == "system" {
+		t.Fatalf("lane event was not given a real pane: %+v", d)
+	}
+	if d["pane_module"] != "GHOST · Keşif" {
+		t.Errorf("pane_module = %v, want GHOST · Keşif", d["pane_module"])
+	}
+	if d["pane_status"] != "open" {
+		t.Errorf("first event on a new pane should open it, got %v", d["pane_status"])
+	}
+}
+
+// Core/system modules must stay in the shared feed and never spawn a pane.
+func TestWithPanes_SystemModuleStaysSystem(t *testing.T) {
+	cap := &captureCtrl{}
+	ctrl := withPanes(cap)
+
+	ctrl.Emit(Event{Level: LevelSystem, Category: CatSystem, Module: "Çekirdek",
+		Message: "scan core started"})
+
+	d := cap.events[0].Data
+	if d != nil && d["pane_id"] != nil && d["pane_id"] != "system" {
+		t.Fatalf("core module should stay in system feed, got pane %v", d["pane_id"])
+	}
+}

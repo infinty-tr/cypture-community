@@ -4,6 +4,9 @@ set -uo pipefail
 AGENT="${1:?kullanım: spawn_agent.sh <ajan-adı> <görev>}"; shift
 PROMPT="${*:?görev metni gerekli}"
 
+# Feed/IPC dizini: konteynerde /cyp, host (live runner) modunda CYP_FEED_DIR.
+FEED="${CYP_FEED_DIR:-/cyp}"
+
 PLAYBOOK=""
 case "$AGENT" in
   recon-agent) ;;  # keşif — playbook gerekmez, hızlı kalsın
@@ -27,7 +30,12 @@ ${PROMPT}"
   echo "skill-inject: ${AGENT} → finding-marker (playbook yok)" >&2
 fi
 
-AGENTS_DIR=/cyp/agents
+# Konteyner-yolu (/cyp) sabitlerini gerçek feed dizinine çevir (host modunda).
+if [ "$FEED" != "/cyp" ]; then
+  PROMPT="${PROMPT//\/cyp\//$FEED/}"
+fi
+
+AGENTS_DIR="$FEED/agents"
 mkdir -p "$AGENTS_DIR"
 
 MAX_PARALLEL="${CYP_MAX_PARALLEL:-6}"
@@ -59,15 +67,24 @@ esac
 MODEL_ARG=(); [ -n "$RUN_MODEL" ] && MODEL_ARG=(-m "$RUN_MODEL")
 PERM_ARG=();  [ -n "${CYP_SKIP_PERMS:-}" ] && PERM_ARG=(--dangerously-skip-permissions)
 
+# Each sub-agent gets its OWN data dir so parallel agent runtimes don't serialize
+# on a single shared data-dir lock (this is what lets a wave spawn many experts at
+# once). Seed the auth into each isolated dir so every sub-agent can authenticate:
+#   - container: the rebranded cypture-agent auth
+#   - host: the operator's real opencode auth (XDG_DATA_HOME/opencode/auth.json)
 DATA="/tmp/oc-${HANDLE}"
-mkdir -p "$DATA/cypture-agent"
+mkdir -p "$DATA/opencode" "$DATA/cypture-agent"
 if [ -f /root/.local/share/cypture-agent/auth.json ]; then
   cp /root/.local/share/cypture-agent/auth.json "$DATA/cypture-agent/auth.json" 2>/dev/null || true
 fi
+SRC_AUTH="${OPENCODE_AUTH:-${XDG_DATA_HOME:-$HOME/.local/share}/opencode/auth.json}"
+if [ -f "$SRC_AUTH" ]; then
+  cp "$SRC_AUTH" "$DATA/opencode/auth.json" 2>/dev/null || true
+fi
 
 (
-  cd /agent || exit 1
-  XDG_DATA_HOME="$DATA" cypture-agent run --format json --agent "$AGENT" \
+  cd "${CYP_PROJECT_ROOT:-/agent}" || exit 1
+  XDG_DATA_HOME="$DATA" "${CYP_AGENT_BIN:-cypture-agent}" run --format json --agent "$AGENT" \
     "${MODEL_ARG[@]}" "${PERM_ARG[@]}" "$PROMPT" >"$OUT" 2>"$LOG"
   echo done > "$STATUS"
   rm -rf "$DATA" 2>/dev/null || true

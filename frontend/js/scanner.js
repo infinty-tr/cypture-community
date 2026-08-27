@@ -305,14 +305,16 @@ const Scanner = (() => {
         const now = Date.now();
         panes.forEach((p) => {
             if (!p.tile || p.tile.classList.contains('done') || p.tile.classList.contains('closed')) return;
-            p.tile.classList.toggle('stalled', now - (p.last || now) > 25000);
+            // Reasoning-heavy models can stay silent for a while; use a
+            // forgiving threshold so live tiles don't flicker "stalled".
+            p.tile.classList.toggle('stalled', now - (p.last || now) > 90000);
         });
     }
     function updateLive() {
         checkStalled();
         const el = document.getElementById('live-ind');
         if (!el) return;
-        el.classList.toggle('alive', liveRunning && (Date.now() - lastTs < 15000));
+        el.classList.toggle('alive', liveRunning && (Date.now() - lastTs < 45000));
     }
     function setLive(on) {
         liveRunning = !!on;

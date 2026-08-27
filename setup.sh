@@ -262,8 +262,16 @@ step_caddy() {
 step_service() {
   section "6) systemd service"
   if [ ! -f "/etc/systemd/system/$SERVICE.service" ]; then
-    warn "/etc/systemd/system/$SERVICE.service not found — create it before enabling."
-    return
+    if [ -f "$APP_DIR/deploy/$SERVICE.service" ]; then
+      info "Installing $SERVICE.service from deploy/ template."
+      sed -e "s#__APP_DIR__#$APP_DIR#g" \
+          -e "s#__RUN_USER__#$RUN_USER#g" \
+          -e "s#__HOME__#$HOME#g" \
+          "$APP_DIR/deploy/$SERVICE.service" | sudo tee "/etc/systemd/system/$SERVICE.service" >/dev/null
+    else
+      warn "/etc/systemd/system/$SERVICE.service not found and no deploy/ template — create it before enabling."
+      return
+    fi
   fi
   pkill -x cypture 2>/dev/null && sleep 1 || true
   sudo systemctl daemon-reload

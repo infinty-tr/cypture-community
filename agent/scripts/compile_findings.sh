@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-FND="${CYP_FINDINGS_FILE:-/cyp/findings.ndjson}"
-OUT="${CYP_FINDINGS_OUT:-/cyp/findings.json}"
+FND="${CYP_FINDINGS_FILE:-${CYP_FEED_DIR:-/cyp}/findings.ndjson}"
+OUT="${CYP_FINDINGS_OUT:-${CYP_FEED_DIR:-/cyp}/findings.json}"
 if [ ! -s "$FND" ]; then
   echo "[]" > "$OUT"
   echo "compile_findings: no input"

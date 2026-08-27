@@ -43,14 +43,14 @@ read -r UNREACH BSPENT BMAX VALIDATED <<<"$(jq -r '
     ([.findings[]? | select(.state=="validated" or .state=="reported")] | length) ] | @tsv' "$SURF")"
 
 LANDED=0
-if [[ -s /cyp/findings.ndjson ]]; then
-  LANDED=$(grep -c '"title"' /cyp/findings.ndjson 2>/dev/null || echo 0)
+if [[ -s ${CYP_FEED_DIR:-/cyp}/findings.ndjson ]]; then
+  LANDED=$(grep -c '"title"' ${CYP_FEED_DIR:-/cyp}/findings.ndjson 2>/dev/null || echo 0)
 fi
-if [[ "${LANDED:-0}" -eq 0 && -s /cyp/findings.json ]]; then
-  LANDED=$(jq 'length' /cyp/findings.json 2>/dev/null || echo 0)
+if [[ "${LANDED:-0}" -eq 0 && -s ${CYP_FEED_DIR:-/cyp}/findings.json ]]; then
+  LANDED=$(jq 'length' ${CYP_FEED_DIR:-/cyp}/findings.json 2>/dev/null || echo 0)
 fi
-if [[ "${LANDED:-0}" -eq 0 && -f /cyp/feed.jsonl ]]; then
-  LANDED=$(grep -c '"t":"find"' /cyp/feed.jsonl 2>/dev/null || echo 0)
+if [[ "${LANDED:-0}" -eq 0 && -f ${CYP_FEED_DIR:-/cyp}/feed.jsonl ]]; then
+  LANDED=$(grep -c '"t":"find"' ${CYP_FEED_DIR:-/cyp}/feed.jsonl 2>/dev/null || echo 0)
 fi
 [[ "$LANDED" =~ ^[0-9]+$ ]] || LANDED=0
 if [[ "$LANDED" -gt "${VALIDATED:-0}" ]]; then VALIDATED="$LANDED"; fi

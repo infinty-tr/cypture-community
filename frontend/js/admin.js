@@ -214,22 +214,10 @@
         $('live-sub').textContent = `mode: ${(st.engagement && st.engagement.mode) || 'full'}`;
         setStat('stat-status', label(st.status));
 
-        try {
-            const { findings } = await api(`/api/scans/${scanId}/findings`);
-            (findings || []).forEach((f) => Findings.addFinding(mapFinding(f)));
-            setStat('stat-vulns', Findings.count()); setCount('nav-findings-count', Findings.count()); setCount('live-find-count', Findings.count());
-        } catch {}
-
-        try {
-            const { traffic } = await api(`/api/scans/${scanId}/traffic`);
-            (traffic || []).forEach((t) => Traffic.add(t));
-        } catch {}
-
-        try {
-            const { events } = await api(`/api/scans/${scanId}/events`);
-            (events || []).forEach((e) => Scanner.addEvent(LEVEL_FEED[e.level] || 'info', e));
-        } catch {}
-
+        // History (events, findings, traffic) is replayed in full by the
+        // WebSocket on-connect handler — with pane routing intact. Pre-loading
+        // it over REST here duplicated every line and dumped agent output into
+        // the system feed, so WS is the single source of truth for replay.
         connectWS(scanId);
         state.liveRunning = RUNNING.includes(st.status);
         Scanner.setLive(state.liveRunning);
@@ -245,8 +233,9 @@
 
         if (isReconnect) { Scanner.clearFeed(); Findings.clearFindings(); Traffic.clear(); }
         const ws = new WebSocket(`${WS}/ws/scan/${scanId}`);
-        ws.onmessage = (ev) => { try { onWs(JSON.parse(ev.data)); } catch {} };
-        ws.onclose = (e) => { if (e.code !== 1000 && state.scanId === scanId && state.liveRunning) setTimeout(() => { if (state.scanId === scanId) connectWS(scanId, true); }, 3000); };
+        ws.onmessage = (ev) => { try { onWs(JSON.parse(ev.data)); } catch (err) { console.error('cockpit: bad WS frame', err, ev.data); } };
+        ws.onerror = (err) => { console.error('cockpit: WS error', err); };
+        ws.onclose = (e) => { if (e.code !== 1000 && state.scanId === scanId && state.liveRunning) { console.warn('cockpit: WS closed (' + e.code + '), reconnecting…'); setTimeout(() => { if (state.scanId === scanId) connectWS(scanId, true); }, 3000); } };
         state.ws = ws;
     }
     const LEVEL_FEED = { info: 'info', success: 'success', warning: 'warning', error: 'error', thought: 'thought', action: 'action', finding: 'finding', system: 'info' };
@@ -379,7 +368,7 @@
         $('report-button')?.addEventListener('click', () => { if (state.scanId) window.open(`${API}/api/scans/${state.scanId}/report?format=html`, '_blank'); });
         $('live-stop')?.addEventListener('click', async () => {
             if (!state.scanId) return;
-            try { await api(`/api/scans/${state.scanId}/stop`, 'POST', {}); Scanner.addFeedItem('warning', 'Durduruluyor…'); }
+            try { await api(`/api/scans/${state.scanId}/stop`, 'POST', {}); Scanner.addFeedItem('warning', 'Stopping…'); }
             catch (e) { Scanner.addFeedItem('error', e.message); }
         });
     }

@@ -39,6 +39,14 @@ the browser.
 > platform and the engine, but you must supply a compatible agent‑runtime binary
 > and point `CYPTURE_AGENT_BIN` at it. Without it, only the `sim` runner (a scripted
 > demo that makes no external calls) will run.
+>
+> **Supported runtime: [opencode](https://opencode.ai).** Install opencode, authenticate a
+> provider (`opencode auth login`), then point `CYPTURE_AGENT_BIN` at the adapter shim in
+> [`scripts/opencode-shim`](scripts/opencode-shim) (copy it somewhere stable). Run with
+> `CYPTURE_RUNNER=live`. In `live` mode the backend runs the `cypture-orchestrator` agent as
+> a local process in `./agent`, which spawns the specialist sub‑agents; each sub‑agent's live
+> stream, findings and traffic surface in the admin **Cockpit**. Set `OPENCODE_BIN` if opencode
+> is not on the service's PATH (e.g. under systemd).
 
 ---
 
@@ -86,16 +94,29 @@ make run          # or: go run ./cmd/cypture
 Open http://127.0.0.1:7777 and log in with the seeded admin account.
 
 The default `CYPTURE_RUNNER=sim` runs a scripted simulation with no external calls —
-safe for exploring the UI. To run **real** scans:
+safe for exploring the UI. To run **real** scans with the supported `live` runner:
 
 ```bash
-export CYPTURE_LLM_API_KEY=sk-...          # your provider key
-export CYPTURE_RUNNER_MODEL=openai/gpt-4o-mini
-make docker-image                          # build cypture-engine:latest
-export CYPTURE_RUNNER=docker                # or k8s
-# ensure a compatible agent runtime is installed and CYPTURE_AGENT_BIN points to it
+# 1. Install opencode and authenticate a provider, then expose the shim as the runtime:
+cp scripts/opencode-shim /usr/local/bin/opencode-shim && chmod +x /usr/local/bin/opencode-shim
+export CYPTURE_AGENT_BIN=/usr/local/bin/opencode-shim
+# export OPENCODE_BIN=/home/you/.local/bin/opencode   # if opencode isn't on PATH
+
+# 2. Pick a model your opencode auth supports, and put cypture-engine on PATH:
+export CYPTURE_RUNNER=live
+export CYPTURE_RUNNER_MODEL=openai/gpt-4o-mini        # or any opencode provider/model
+export CYPTURE_RUNNER_AGENT=cypture-orchestrator
+make build && export PATH="$PWD/bin:$PATH"            # builds cypture + cypture-engine
+
 go run ./cmd/cypture
 ```
+
+Open a scan and watch the specialist agents populate the **Cockpit** at `/admin`.
+
+> **Docker / k8s runners are advanced.** The shipped engine image (`docker/`) expects a
+> scan‑brain binary and staging (`docker/bin/`) that are **not** part of this repo, so
+> `make docker-image` / `CYPTURE_RUNNER=docker|k8s` will not run a full scan out of the box —
+> bring your own engine, or use the `live` runner above.
 
 See `.env.example` for every option.
 
