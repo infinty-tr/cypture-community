@@ -115,24 +115,6 @@ func (AgentRunner) Run(ctx context.Context, spec RunSpec, ctrl Controller) error
 	if spec.ReasoningModel != "" {
 		env = append(env, "CYP_MODEL_REASONING="+spec.ReasoningModel)
 	}
-	// BYOK (live runner): hand the resolved per-scan LLM key to spawn_agent.sh so
-	// each specialist authenticates with THIS user's key instead of the operator's
-	// shared opencode auth.json. The key stays in cmd.Env (never argv), and there is
-	// one Run per scan, so concurrent scans of different users stay isolated. When no
-	// per-user key is set the vars are absent and spawn_agent.sh falls back to the
-	// operator's ambient auth (single-operator behavior, unchanged).
-	if k := strings.TrimSpace(spec.LLMAPIKey); k != "" {
-		env = append(env, "CYP_LLM_API_KEY="+k)
-		prov := strings.TrimSpace(spec.LLMProvider)
-		if prov == "" {
-			if i := strings.Index(spec.Model, "/"); i > 0 {
-				prov = spec.Model[:i]
-			}
-		}
-		if prov != "" {
-			env = append(env, "CYP_LLM_PROVIDER="+prov)
-		}
-	}
 	if strings.TrimSpace(spec.OperatorPrompt) != "" {
 		env = append(env, "CYP_OPERATOR_PROMPT="+spec.OperatorPrompt)
 	}
@@ -191,7 +173,7 @@ func mapEvents(ev ocEvent, dispatched map[string]bool) []Event {
 		if ref := strings.TrimSpace(ev.Error.Data.Ref); ref != "" {
 			full += " (" + ref + ")"
 		}
-		if fatal, ok, _ := classifyFatal(full); ok {
+		if fatal, ok := classifyFatal(full); ok {
 			return []Event{{Level: LevelError, Category: CatSystem, Module: "Çekirdek",
 				Message: fatal}}
 		}

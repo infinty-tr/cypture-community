@@ -229,12 +229,6 @@ func Load() *Config {
 		slog.Warn("ADMIN_PASSWORD not set — no seed admin will be created until you set one.")
 	}
 
-	if strings.TrimSpace(os.Getenv("CYP_DATA_KEY")) == "" {
-		slog.Warn("CYP_DATA_KEY not set — stored provider API keys (BYOK/pool) and test " +
-			"credentials are kept in PLAINTEXT at rest. Set a 32-byte key to encrypt them " +
-			"(generate with `openssl rand -base64 32`).")
-	}
-
 	return c
 }
 
@@ -260,11 +254,6 @@ func (c *Config) Validate() error {
 	if c.RunnerSkipPerms {
 		problems = append(problems, "CYPTURE_RUNNER_SKIP_PERMS must be false in prod "+
 			"(skipping permission prompts is unsafe)")
-	}
-
-	if strings.TrimSpace(os.Getenv("CYP_DATA_KEY")) == "" {
-		problems = append(problems, "CYP_DATA_KEY must be set in prod to encrypt stored "+
-			"API keys / credentials at rest (32-byte base64, e.g. `openssl rand -base64 32`)")
 	}
 
 	if len(problems) > 0 {

@@ -394,28 +394,12 @@ func CleanStaleFeedDirs() int {
 		return 0
 	}
 	n := 0
-	// Only sweep key files older than this, so we never delete a file belonging to
-	// an in-flight scan/validation on this same host.
-	cutoff := time.Now().Add(-1 * time.Hour)
 	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() && strings.HasPrefix(name, "cyp-feed-") {
-			if removeFeedDir(filepath.Join(tmp, name)) {
-				n++
-			}
+		if !e.IsDir() || !strings.HasPrefix(e.Name(), "cyp-feed-") {
 			continue
 		}
-		// Leaked plaintext key temp files from a crashed scan (cyp-key-*) or key
-		// validation (cyp-vkey-*). Their per-scan defer normally removes them; this
-		// is the crash-recovery backstop.
-		if !e.IsDir() && (strings.HasPrefix(name, "cyp-key-") || strings.HasPrefix(name, "cyp-vkey-")) {
-			info, ierr := e.Info()
-			if ierr != nil || info.ModTime().After(cutoff) {
-				continue
-			}
-			if os.Remove(filepath.Join(tmp, name)) == nil {
-				n++
-			}
+		if removeFeedDir(filepath.Join(tmp, e.Name())) {
+			n++
 		}
 	}
 	return n

@@ -133,7 +133,7 @@ func (s *Server) handleAcceptEngagement(w http.ResponseWriter, r *http.Request) 
 	s.audit(actor.ID, "engagement.accept", "engagement", e.ID, "seed="+seed, clientIP(r))
 
 	if req.LLMAPIKey != nil {
-		kupd := map[string]any{"llm_api_key": models.EncryptSecret(strings.TrimSpace(*req.LLMAPIKey))}
+		kupd := map[string]any{"llm_api_key": strings.TrimSpace(*req.LLMAPIKey)}
 		if req.LLMProvider != nil {
 			kupd["llm_provider"] = strings.TrimSpace(*req.LLMProvider)
 		}

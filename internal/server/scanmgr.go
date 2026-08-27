@@ -424,16 +424,12 @@ func (m *ScanManager) runWithFailover(ctx context.Context, run *scanRun, spec or
 			m.pool.MarkUsed(run.keyID)
 			return nil
 		}
-		// Only a key-specific failure (invalid key / no balance) justifies
-		// disabling this pool key and rotating. A model-side error (unknown model)
-		// is not the key's fault — failing the scan without touching the pool
-		// prevents one bad model name from disabling every key in the pool.
-		if !errors.Is(err, orchestrator.ErrFatalKey) {
+		if !errors.Is(err, orchestrator.ErrFatalModel) {
 			return err
 		}
 
 		tried[run.keyID] = true
-		m.pool.Disable(run.keyID, "provider key rejected during scan")
+		m.pool.Disable(run.keyID, "terminal provider error during scan")
 		next, nerr := m.pool.Reassign(run.userID, tried)
 		if nerr != nil || next == nil {
 			return err

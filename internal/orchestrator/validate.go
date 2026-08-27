@@ -9,26 +9,12 @@ import (
 	"time"
 )
 
-// validateSem caps how many validation containers can be spawned at once across
-// the whole server, so an authenticated user cannot exhaust host resources by
-// hammering the "validate key" button (each validation is a `docker run`).
-var validateSem = make(chan struct{}, 2)
-
 func ValidateLLM(ctx context.Context, image, apiKey, provider, model string) (bool, string) {
 	if image == "" {
 		image = "cypture-engine:latest"
 	}
 	if strings.TrimSpace(apiKey) == "" || strings.TrimSpace(model) == "" {
 		return false, "key and model are required"
-	}
-
-	select {
-	case validateSem <- struct{}{}:
-		defer func() { <-validateSem }()
-	case <-time.After(20 * time.Second):
-		return false, "validation is busy — please retry in a moment"
-	case <-ctx.Done():
-		return false, "validation cancelled"
 	}
 	prov := strings.TrimSpace(provider)
 	if i := strings.Index(model, "/"); i > 0 {
@@ -67,18 +53,16 @@ func ValidateLLM(ctx context.Context, image, apiKey, provider, model string) (bo
 	runArgs := []string{"run", "--rm", "--name", name, "--entrypoint", "sh",
 		"--security-opt", "no-new-privileges",
 		"-e", "PROV=" + prov, "-e", "MODEL=" + model}
-	// The key is passed via a 0600 file mounted read-only — NEVER via argv/env,
-	// where `ps` / `docker inspect` would expose it. If the temp file cannot be
-	// created, abort rather than fall back to a key-in-argv command line.
-	kf, err := os.CreateTemp("", "cyp-vkey-*")
-	if err != nil {
-		return false, "could not create a secure temp file for the key; validation aborted"
+	runScript := script
+	if kf, err := os.CreateTemp("", "cyp-vkey-*"); err == nil {
+		_, _ = kf.WriteString(apiKey)
+		_ = kf.Close()
+		defer os.Remove(kf.Name())
+		runArgs = append(runArgs, "-v", kf.Name()+":/run/cyp_vkey:ro")
+		runScript = `KEY="$(cat /run/cyp_vkey)"; ` + script
+	} else {
+		runArgs = append(runArgs, "-e", "KEY="+apiKey)
 	}
-	_, _ = kf.WriteString(apiKey)
-	_ = kf.Close()
-	defer os.Remove(kf.Name())
-	runArgs = append(runArgs, "-v", kf.Name()+":/run/cyp_vkey:ro")
-	runScript := `KEY="$(cat /run/cyp_vkey)"; ` + script
 	runArgs = append(runArgs, image, "-c", runScript)
 	cmd := exec.CommandContext(ctx2, "docker", runArgs...)
 	out, _ := cmd.CombinedOutput()
