@@ -108,6 +108,9 @@ export CYPTURE_RUNNER_MODEL=openai/gpt-4o-mini        # or any opencode provider
 export CYPTURE_RUNNER_AGENT=cypture-orchestrator
 make build && export PATH="$PWD/bin:$PATH"            # builds cypture + cypture-engine
 
+# 3. (Optional) install the opencode loop-enforcer plugin dependency:
+( cd agent/.cypture && npm install )                  # or: bun install
+
 go run ./cmd/cypture
 ```
 
