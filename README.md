@@ -141,7 +141,8 @@ make docker-image # build the scan engine image
 ## Configuration
 
 All configuration is via environment variables — see `.env.example` for the full,
-documented list. Highlights:
+documented list. 
+Highlights:
 
 | Variable | Purpose |
 | --- | --- |
