@@ -127,6 +127,30 @@ Open a scan and watch the specialist agents populate the **Cockpit** at `/admin`
 
 See `.env.example` for every option.
 
+> **⚙️ Running notes (read this if a `live` scan finishes with 0 findings).**
+> The `live` runner spawns the opencode agent, which needs three things wired up or
+> the orchestrator starts but never really scans:
+> 1. **`cypture-engine` must be on `PATH`.** `make build` builds it into `bin/`; then
+>    `export PATH="$PWD/bin:$PATH"`. Without it the agent has no `cyp_*` HTTP tools and
+>    the scan ends immediately with no traffic/findings.
+> 2. **`CYPTURE_AGENT_BIN` must point at the opencode shim** (`scripts/opencode-shim`),
+>    and set `OPENCODE_BIN` if `opencode` isn't on the service `PATH`.
+> 3. **opencode must be authenticated for your `CYPTURE_RUNNER_MODEL`** (`opencode auth
+>    login`) — otherwise the specialist sub‑agents can't start.
+>
+> Scan depth/quality also depends heavily on the model you pick in
+> `CYPTURE_RUNNER_MODEL`: a weak/free model may stall on environment inspection instead
+> of driving the specialist waves. Use a capable agentic model for real scans.
+>
+> **Per‑user API keys:** each account enters its own provider key under
+> **Settings → LLM** (unchanged, original behavior); the operator fallback stays
+> `CYPTURE_LLM_API_KEY`. (An experimental at‑rest‑encryption / live‑runner BYOK rework
+> was reverted because it interfered with scanning on some setups.)
+>
+> **🐳 Coming soon — one‑command Docker.** A self‑contained Docker deployment is planned
+> so anyone can `docker`‑up a working instance without wiring the engine/PATH/opencode
+> manually, and get consistent behavior across machines. Until then, follow the steps above.
+
 ---
 
 ## Build & test
