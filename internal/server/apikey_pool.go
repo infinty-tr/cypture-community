@@ -120,6 +120,11 @@ func (s *Server) handleToggleAPIKey(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDeleteAPIKey(w http.ResponseWriter, r *http.Request) {
 	actor, _ := auth.UserFrom(r.Context())
 	id := r.PathValue("id")
+	var entry models.APIKeyPoolEntry
+	if err := s.DB.First(&entry, "id = ?", id).Error; err != nil {
+		writeErr(w, http.StatusNotFound, "key not found")
+		return
+	}
 	s.DB.Where("key_id = ?", id).Delete(&models.UserKeyAssignment{})
 	if err := s.DB.Delete(&models.APIKeyPoolEntry{}, "id = ?", id).Error; err != nil {
 		writeErr(w, http.StatusInternalServerError, "could not delete key")

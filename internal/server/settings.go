@@ -24,11 +24,19 @@ func getSetting(db *gorm.DB, key string) string {
 	if err := db.First(&s, "key = ?", key).Error; err != nil {
 		return ""
 	}
-	return strings.TrimSpace(s.Value)
+	v := strings.TrimSpace(s.Value)
+	if key == settingLLMAPIKey {
+		v = models.DecryptSecret(v)
+	}
+	return v
 }
 
 func setSetting(db *gorm.DB, key, value string) error {
-	return db.Save(&models.Setting{Key: key, Value: strings.TrimSpace(value), UpdatedAt: time.Now()}).Error
+	value = strings.TrimSpace(value)
+	if key == settingLLMAPIKey {
+		value = models.EncryptSecret(value)
+	}
+	return db.Save(&models.Setting{Key: key, Value: value, UpdatedAt: time.Now()}).Error
 }
 
 func maskKey(k string) string {
@@ -157,6 +165,19 @@ func (s *Server) handleSetMyLLM(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.LLMAPIKey != nil && len(*req.LLMAPIKey) > 512 {
+		writeErr(w, http.StatusBadRequest, "api key is too long")
+		return
+	}
+	if req.LLMProvider != nil && len(*req.LLMProvider) > 64 {
+		writeErr(w, http.StatusBadRequest, "provider is too long")
+		return
+	}
+	if req.RunnerModel != nil && len(*req.RunnerModel) > 128 {
+		writeErr(w, http.StatusBadRequest, "model id is too long")
+		return
+	}
+
 	if req.Validate {
 		var usr models.User
 		s.DB.First(&usr, "id = ?", u.ID)
@@ -179,7 +200,8 @@ func (s *Server) handleSetMyLLM(w http.ResponseWriter, r *http.Request) {
 
 	updates := map[string]any{}
 	if req.LLMAPIKey != nil {
-		updates["llm_api_key"] = strings.TrimSpace(*req.LLMAPIKey)
+		// Map-based Updates bypass the User BeforeSave hook, so encrypt here.
+		updates["llm_api_key"] = models.EncryptSecret(strings.TrimSpace(*req.LLMAPIKey))
 	}
 	if req.LLMProvider != nil {
 		updates["llm_provider"] = strings.TrimSpace(*req.LLMProvider)

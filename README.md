@@ -58,11 +58,13 @@ Docker/Kubernetes runners. Bring your own LLM provider key and model.
 
 **Different from the hosted edition:**
 
-- **Single operator (admin‑only).** There is no self‑registration and no
-  customer/multi‑tenant accounts. One admin account, seeded from `ADMIN_EMAIL` /
-  `ADMIN_PASSWORD`, logs in and runs scans.
+- **Admin‑seeded accounts, no open self‑registration.** One admin account is seeded
+  from `ADMIN_EMAIL` / `ADMIN_PASSWORD`; the admin can invite additional client/viewer
+  accounts. There is no public sign‑up page. Each account can bring its own LLM key
+  (see [BYOK](#bring-your-own-key-byok--the-api-key-pool)) — for strong per‑user
+  isolation across a community, use the `docker`/`k8s` runners.
 - **No billing.** No payments, subscriptions, quotas, or credit ledger — scans are
-  unlimited.
+  unlimited. Provider cost flows to whichever key ran the scan.
 - **Cross‑target learning disabled.** The hosted edition accumulates generalized,
   cross‑engagement "priors" to sharpen future scans; that subsystem is off here.
   Per‑target scan memory (a scan remembering the same target's own prior findings)
@@ -144,13 +146,76 @@ documented list. Highlights:
 | Variable | Purpose |
 | --- | --- |
 | `CYPTURE_SESSION_SECRET` | 32+ byte secret for signed cookies / CSRF (**required in prod**) |
+| `CYP_DATA_KEY` | 32‑byte key that AES‑256‑GCM‑encrypts stored provider keys & credentials at rest (**required in prod**; see [BYOK](#bring-your-own-key-byok--the-api-key-pool)) |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Seed admin account, created on first boot |
-| `CYPTURE_RUNNER` | `sim` / `docker` / `k8s` |
-| `CYPTURE_LLM_API_KEY` / `CYPTURE_RUNNER_MODEL` | Your LLM provider key and model id |
+| `CYPTURE_RUNNER` | `sim` / `live` / `docker` / `k8s` |
+| `CYPTURE_LLM_API_KEY` / `CYPTURE_RUNNER_MODEL` | Operator‑level fallback LLM provider key and model id |
 | `CYPTURE_AGENT_BIN` | Path/name of the agent‑runtime binary (default `cypture-agent`) |
 | `CYPTURE_ENGINE_BIN` | Name of the engine binary in the image (default `cypture-engine`) |
 | `CYPTURE_DB_PATH` | SQLite database path |
 | `CYPTURE_REPORT_COMPANY` / `_SITE` / `_PARTNER` / `_CLASSIFICATION` / `_LOGO_DATA_URI` | Branding printed on generated reports (default: generic "Cypture") |
+
+---
+
+## Bring‑your‑own‑key (BYOK) & the API key pool
+
+Cypture never hardcodes a provider key into a scan. Instead there are **three
+sources** for the LLM key a scan uses, resolved in this order per engagement
+(`internal/server/scanmgr.go`):
+
+1. **The scan owner's own key (BYOK).** Any signed‑in user can save their own
+   provider key, provider, and model under **Settings → LLM** (the
+   `GET`/`POST /api/settings/llm` endpoints). When set, that scan authenticates
+   with — and is billed to — **that user's** key. This is the path for a community
+   where each person brings their own OpenAI / OpenRouter / Anthropic / … key.
+2. **The operator key pool.** An admin can add a pool of keys under **Admin → API
+   Keys** (`/api/admin/api-keys`). Users without their own key are assigned the
+   least‑loaded active pool key. If a key is rejected by the provider (bad key / no
+   balance) it is disabled and the user is rotated to another pool key.
+3. **The operator fallback key** — the global `llm_api_key` admin setting, else the
+   `CYPTURE_LLM_API_KEY` environment variable.
+
+A user only ever reads or writes **their own** key (the handler keys off the session
+identity — there is no way to set another user's key), and the key is returned to the
+UI **masked** (`sk‑12…cd`), never in full.
+
+### Encryption at rest — set `CYP_DATA_KEY`
+
+Every stored secret — each user's BYOK key, every pool key, the global key, and
+per‑scan test credentials — is **AES‑256‑GCM encrypted in the SQLite database** using
+`CYP_DATA_KEY` (`internal/models/datacrypt.go`).
+
+- Generate one: `openssl rand -base64 32`, then set `CYP_DATA_KEY=…` in `.env`.
+- **Required in prod:** the boot‑time `Validate()` refuses to start `CYPTURE_ENV=prod`
+  without it.
+- If it is unset, keys fall back to **plaintext at rest** and a warning is logged. On
+  first boot *after* you set the key, any existing plaintext rows are migrated to
+  ciphertext automatically (idempotent).
+- Losing `CYP_DATA_KEY` means the stored keys can no longer be decrypted — back it up.
+
+### Runner choice matters for multi‑tenant BYOK
+
+How well each user's key is **isolated** depends on the runner:
+
+| Runner | BYOK behaviour | Isolation |
+| --- | --- | --- |
+| `docker` / `k8s` | Each scan runs in its own container/pod. The user's key is written to a `0600` file mounted read‑only (never in argv/env); the shared operator auth is *not* mounted alongside it. | **Strong — recommended for a real multi‑user community.** |
+| `live` | The user's key is handed to the host agent process per scan (in `cmd.Env`, one process per scan) and each specialist sub‑agent authenticates from a per‑scan `auth.json` built from that key. | Good for a **single operator / small trusted group**; all scans still share one host. |
+| `sim` | No external calls — keys are irrelevant (UI demo only). | n/a |
+
+> The shipped `docker/`/`k8s` engine image expects a scan‑brain binary that is **not**
+> part of this repo (see the runner note above), so those runners need you to supply an
+> engine image. For a small trusted community the `live` runner works out of the box
+> with [opencode](https://opencode.ai); for a larger multi‑tenant deployment, prefer the
+> container runners for per‑tenant isolation.
+
+### Billing
+
+The Community Edition **does not bill** (`CYPTURE_PRICE_MARKUP` only affects a displayed
+figure). Cost flows directly to whichever key ran the scan — the user's own key under
+BYOK, otherwise the operator's pool/fallback key. A scan that fails on a user's own key
+(bad key / no balance) **fails cleanly** and is never silently retried on the operator's
+key.
 
 ---
 
@@ -174,6 +239,16 @@ test. Run behind authentication, keep your `.env` secret, and prefer the network
 isolation the Docker/Kubernetes runners provide (the k8s runner ships an egress
 NetworkPolicy that blocks cloud‑metadata and private ranges). To report a
 vulnerability in Cypture itself, see [`SECURITY.md`](SECURITY.md).
+
+**Handling of provider keys.** Stored keys are AES‑256‑GCM encrypted at rest when
+`CYP_DATA_KEY` is set (**required in prod**), are never serialized back to a client in
+full (only masked), and are never placed on a process command line — scan and
+validation containers receive the key via a `0600` file mount, and the host `live`
+runner via the scan's own environment. Feed/report text is scrubbed for anything shaped
+like a key or bearer token before it is stored or shown. State‑changing endpoints are
+CSRF‑protected, admin/key‑pool endpoints are role‑gated, and a user can only manage
+their own key. See [BYOK](#bring-your-own-key-byok--the-api-key-pool) for the full
+model.
 
 ## Contributing
 

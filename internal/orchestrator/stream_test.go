@@ -18,9 +18,18 @@ func TestClassifyFatal(t *testing.T) {
 		"authentication failed: bad token",
 	}
 	for _, l := range fatal {
-		if _, ok := classifyFatal(l); !ok {
+		if _, ok, _ := classifyFatal(l); !ok {
 			t.Errorf("expected FATAL for %q", l)
 		}
+	}
+
+	// Key-specific (balance/auth) errors must be flagged so the pool disables the
+	// key; a model-side error must NOT be (it would burn every pool key).
+	if _, ok, keySpecific := classifyFatal("Invalid API key provided"); !ok || !keySpecific {
+		t.Errorf("bad-key error should be fatal AND key-specific")
+	}
+	if _, ok, keySpecific := classifyFatal("model not found: gpt-nope"); !ok || keySpecific {
+		t.Errorf("model error should be fatal but NOT key-specific")
 	}
 
 	ok := []string{
@@ -30,7 +39,7 @@ func TestClassifyFatal(t *testing.T) {
 		`{"type":"step_finish","tokens":{"total":5}}`,
 	}
 	for _, l := range ok {
-		if msg, hit := classifyFatal(l); hit {
+		if msg, hit, _ := classifyFatal(l); hit {
 			t.Errorf("false positive on %q → %q", l, msg)
 		}
 	}
@@ -39,7 +48,7 @@ func TestClassifyFatal(t *testing.T) {
 func TestFatalScanWriter(t *testing.T) {
 	var got string
 	w := &fatalScanWriter{onLine: func(line string) {
-		if _, ok := classifyFatal(line); ok {
+		if _, ok, _ := classifyFatal(line); ok {
 			got = line
 		}
 	}}
@@ -63,7 +72,7 @@ func TestParseStreamFailFastGate(t *testing.T) {
 	run := func(line string) bool {
 		tripped := false
 		var saw atomic.Bool
-		parseStream(context.Background(), strings.NewReader(line+"\n"), nopController{}, &saw, func(string) { tripped = true })
+		parseStream(context.Background(), strings.NewReader(line+"\n"), nopController{}, &saw, func(string, bool) { tripped = true })
 		return tripped
 	}
 

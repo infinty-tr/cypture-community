@@ -91,8 +91,8 @@ type User struct {
 	LockedUntil  *time.Time `json:"-"`
 
 	LLMAPIKey   string `json:"-"`
-	LLMProvider string `json:"llm_provider"`
-	RunnerModel string `json:"runner_model"`
+	LLMProvider string `gorm:"size:64" json:"llm_provider"`
+	RunnerModel string `gorm:"size:128" json:"runner_model"`
 }
 
 type Engagement struct {

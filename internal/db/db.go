@@ -68,6 +68,10 @@ func Open(path string, dev bool) (*gorm.DB, error) {
 		return nil, fmt.Errorf("automigrate: %w", err)
 	}
 
+	// One-time upgrade of any plaintext secret columns to encrypted-at-rest.
+	// No-op when CYP_DATA_KEY is unset or values are already encrypted.
+	models.EncryptExistingSecrets(gdb)
+
 	slog.Info("database ready", "path", path)
 	return gdb, nil
 }

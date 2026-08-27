@@ -69,17 +69,34 @@ PERM_ARG=();  [ -n "${CYP_SKIP_PERMS:-}" ] && PERM_ARG=(--dangerously-skip-permi
 
 # Each sub-agent gets its OWN data dir so parallel agent runtimes don't serialize
 # on a single shared data-dir lock (this is what lets a wave spawn many experts at
-# once). Seed the auth into each isolated dir so every sub-agent can authenticate:
+# once). Seed the auth into each isolated dir so every sub-agent can authenticate.
+#
+# BYOK: when the live runner passes CYP_LLM_API_KEY (the scan owner's own key),
+# build a per-scan auth.json from THAT key instead of copying the operator's shared
+# credential — so each user's scan bills their own provider account and stays
+# isolated. Provider comes from CYP_LLM_PROVIDER or the model prefix. When no
+# per-user key is present, fall back to the operator's ambient auth (single-operator):
 #   - container: the rebranded cypture-agent auth
 #   - host: the operator's real opencode auth (XDG_DATA_HOME/opencode/auth.json)
 DATA="/tmp/oc-${HANDLE}"
 mkdir -p "$DATA/opencode" "$DATA/cypture-agent"
-if [ -f /root/.local/share/cypture-agent/auth.json ]; then
-  cp /root/.local/share/cypture-agent/auth.json "$DATA/cypture-agent/auth.json" 2>/dev/null || true
-fi
-SRC_AUTH="${OPENCODE_AUTH:-${XDG_DATA_HOME:-$HOME/.local/share}/opencode/auth.json}"
-if [ -f "$SRC_AUTH" ]; then
-  cp "$SRC_AUTH" "$DATA/opencode/auth.json" 2>/dev/null || true
+if [ -n "${CYP_LLM_API_KEY:-}" ] && command -v jq >/dev/null 2>&1; then
+  PROV="${CYP_LLM_PROVIDER:-}"
+  [ -z "$PROV" ] && case "${CYP_MODEL:-}" in */*) PROV="${CYP_MODEL%%/*}" ;; esac
+  if [ -n "$PROV" ]; then
+    AUTH_JSON="$(jq -nc --arg p "$PROV" --arg k "$CYP_LLM_API_KEY" '{($p):{type:"api",key:$k}}')"
+    printf '%s' "$AUTH_JSON" > "$DATA/opencode/auth.json"
+    printf '%s' "$AUTH_JSON" > "$DATA/cypture-agent/auth.json"
+    chmod 600 "$DATA/opencode/auth.json" "$DATA/cypture-agent/auth.json" 2>/dev/null || true
+  fi
+else
+  if [ -f /root/.local/share/cypture-agent/auth.json ]; then
+    cp /root/.local/share/cypture-agent/auth.json "$DATA/cypture-agent/auth.json" 2>/dev/null || true
+  fi
+  SRC_AUTH="${OPENCODE_AUTH:-${XDG_DATA_HOME:-$HOME/.local/share}/opencode/auth.json}"
+  if [ -f "$SRC_AUTH" ]; then
+    cp "$SRC_AUTH" "$DATA/opencode/auth.json" 2>/dev/null || true
+  fi
 fi
 
 (

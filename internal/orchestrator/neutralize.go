@@ -91,11 +91,16 @@ var (
 	ansiEscape  = regexp.MustCompile("\x1b\\[[0-9;]*[A-Za-z]")
 	ansiRemnant = regexp.MustCompile(`\[[0-9;]+m`)
 	wsCollapse  = regexp.MustCompile(`[ \t]{2,}`)
+	// Defense-in-depth: redact anything shaped like a provider API key or bearer
+	// token before feed/report text is persisted or shown, in case the model or a
+	// scanned target ever echoes one.
+	secretPat = regexp.MustCompile(`(?i)(sk-(?:or-|ant-)?[A-Za-z0-9_\-]{16,}|bearer\s+[A-Za-z0-9._\-]{16,})`)
 )
 
 func Scrub(s string) string {
 	s = ansiEscape.ReplaceAllString(s, "")
 	s = ansiRemnant.ReplaceAllString(s, "")
+	s = secretPat.ReplaceAllString(s, "[redacted]")
 	return strings.TrimSpace(wsCollapse.ReplaceAllString(s, " "))
 }
 

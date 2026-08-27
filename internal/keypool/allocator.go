@@ -2,6 +2,7 @@ package keypool
 
 import (
 	"errors"
+	"sync"
 	"time"
 
 	"gorm.io/gorm"
@@ -12,7 +13,14 @@ import (
 
 var ErrNoKey = errors.New("no active pool key")
 
-type Allocator struct{ db *gorm.DB }
+type Allocator struct {
+	db *gorm.DB
+	// mu serializes assign() so the least-loaded balance read and the assignment
+	// write are atomic across goroutines. SQLite does not honour SELECT ... FOR
+	// UPDATE, so an app-level lock is the reliable way to avoid two concurrent
+	// assigns picking the same key from stale counts.
+	mu sync.Mutex
+}
 
 func New(db *gorm.DB) *Allocator { return &Allocator{db: db} }
 
@@ -40,6 +48,8 @@ func (a *Allocator) Reassign(userID string, exclude map[string]bool) (*models.AP
 }
 
 func (a *Allocator) assign(userID string, exclude map[string]bool) (*models.APIKeyPoolEntry, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 
 	var best *models.APIKeyPoolEntry
 	err := a.db.Transaction(func(tx *gorm.DB) error {
