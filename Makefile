@@ -1,4 +1,4 @@
-.PHONY: run build vet fmt tidy clean
+.PHONY: run build vet fmt tidy clean docker-ce docker-ce-up docker-ce-down
 
 run:
 	go run ./cmd/cypture
@@ -33,3 +33,16 @@ docker-image:
 	fi
 
 .PHONY: docker-image
+
+# ── Community Edition all-in-one image (recommended) ──────────────────────────
+# Self-contained: server + engine + opencode + agents + recon toolchain in one
+# image. `docker compose up` gives a working scan instance on any machine.
+docker-ce:
+	docker compose build
+
+docker-ce-up:
+	docker compose up -d --build
+	@echo "Cypture CE → http://localhost:7777/admin"
+
+docker-ce-down:
+	docker compose down

@@ -1,0 +1,39 @@
+# Cypture Community Edition — one-command deployment.
+#
+#   1. cp .env.example .env   &&   edit CYPTURE_LLM_API_KEY / CYPTURE_RUNNER_MODEL
+#   2. docker compose up -d --build
+#   3. open http://localhost:7777/admin   (login: ADMIN_EMAIL / ADMIN_PASSWORD)
+#
+# Everything (server + engine + opencode + agents) runs in this one container via
+# the in-container `live` runner — no host wiring, consistent on every machine.
+
+services:
+  cypture:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ce
+    image: cypture-ce:latest
+    container_name: cypture-ce
+    ports:
+      - "127.0.0.1:7777:7777"          # bind to localhost by default; front with Caddy for public TLS
+    env_file:
+      - .env
+    environment:
+      # In-container wiring (do not usually change these):
+      CYPTURE_RUNNER: live
+      CYPTURE_AGENT_DIR: /agent
+      CYPTURE_FRONTEND_DIR: /frontend
+      CYPTURE_AGENT_BIN: /usr/local/bin/cypture-agent
+      CYPTURE_DB_PATH: /data/cypture.db
+      CYPTURE_HOST: 0.0.0.0
+      CYPTURE_PORT: "7777"
+      CYPTURE_RUNNER_AGENT: cypture-orchestrator
+    volumes:
+      - cypture-data:/data                # SQLite DB + persistence survives restarts
+    restart: unless-stopped
+    # A scan runs up to CYP_MAX_PARALLEL (default 6) opencode subprocesses + chromium
+    # + the engine simultaneously — give it room.
+    shm_size: "1gb"
+
+volumes:
+  cypture-data:

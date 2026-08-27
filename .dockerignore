@@ -6,6 +6,9 @@ dist/
 *.db-shm
 *.db-wal
 agent/targets/*/
+# Regenerated inside the image via `npm ci`; keep it out of the build context.
+agent/.cypture/node_modules/
+node_modules/
 # Claude-format agent copies (sync_claude_agents.sh output): cypture-agent also reads
 # .claude/agents/ for Claude-compat, but those copies carry no `mode:` line so it
 # defaults them to SUBAGENT — which shadows the .cypture/agents/ primaries and
@@ -13,3 +16,9 @@ agent/targets/*/
 # .cypture/agents/ (the single source of truth). Keep this excluded.
 agent/.claude/
 **/__pycache__/
+
+# Secrets — never in the build context
+.env
+.env.*
+!.env.example
+docker-compose.override.yml

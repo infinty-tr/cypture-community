@@ -84,6 +84,41 @@ Docker/Kubernetes runners. Bring your own LLM provider key and model.
 
 ---
 
+## 🐳 Run with Docker (recommended)
+
+One command, one container, identical on every machine — the image bundles the
+server, `cypture-engine`, the **opencode** runtime, the agent knowledge base and the
+full recon toolchain, and runs the `live` runner in‑container. No host PATH / opencode
+/ engine wiring, so you don't hit the "scan finishes with 0 findings" setup traps.
+
+```bash
+cp .env.example .env
+# Edit .env — the two that matter for a real scan:
+#   CYPTURE_LLM_API_KEY     your provider key (OpenAI / OpenRouter / Anthropic / …)
+#   CYPTURE_RUNNER_MODEL    e.g. openai/gpt-4o-mini  (any opencode provider/model)
+# Also set ADMIN_PASSWORD, and CYPTURE_SESSION_SECRET if CYPTURE_ENV=prod.
+
+docker compose up -d --build          # first build pulls the full toolchain (~a few GB)
+# → open http://localhost:7777/admin   (login with ADMIN_EMAIL / ADMIN_PASSWORD)
+```
+
+The SQLite database persists in the `cypture-data` volume. To use a provider you
+already authenticated with `opencode auth login`, mount its auth instead of setting a
+key: add `- ~/.local/share/opencode/auth.json:/root/.local/share/opencode/auth.json:ro`
+under the service's `volumes` in `docker-compose.yml`.
+
+> **Scan quality still depends on the model.** Pick a capable agentic
+> `CYPTURE_RUNNER_MODEL` — a weak/free model may stall instead of driving the
+> specialist agents. The agents are blackbox‑only (they test the live target and never
+> clone/read a target app's source).
+>
+> **Isolation note.** In this all‑in‑one image, scans run in the same container as the
+> server (fine for a single‑operator self‑host). There is no per‑scan network egress
+> containment; if you need SSRF containment, run the container on a restricted Docker
+> network / behind an egress firewall.
+
+---
+
 ## Quick start (development)
 
 ```bash
@@ -147,9 +182,8 @@ See `.env.example` for every option.
 > `CYPTURE_LLM_API_KEY`. (An experimental at‑rest‑encryption / live‑runner BYOK rework
 > was reverted because it interfered with scanning on some setups.)
 >
-> **🐳 Coming soon — one‑command Docker.** A self‑contained Docker deployment is planned
-> so anyone can `docker`‑up a working instance without wiring the engine/PATH/opencode
-> manually, and get consistent behavior across machines. Until then, follow the steps above.
+> **🐳 Prefer Docker** (below) to skip all of this wiring — the image bakes the engine,
+> opencode, the agent bin and PATH in, so scans behave the same on every machine.
 
 ---
 

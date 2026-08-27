@@ -1,0 +1,148 @@
+# Cypture Community Edition — self-contained ALL-IN-ONE image.
+#
+# One container runs the whole stack: the cypture web server (cmd/cypture) + the
+# cypture-engine (MITM proxy on :8080 + cyp_* MCP tools) + the opencode agent
+# runtime + the full recon toolchain + the /agent knowledge base. The `live`
+# runner spawns opencode as an in-container subprocess (NO docker socket needed),
+# so `docker compose up` gives an identical, working scan instance on any machine
+# — no host PATH/opencode/engine wiring.
+#
+# Build:  docker compose build   (or: make docker-ce)
+# Run:    docker compose up -d    → http://localhost:7777/admin
+
+# ── Stage 1: recon toolchain (Go tools) ───────────────────────────────────────
+FROM golang:1.24-bookworm AS recon
+ENV CGO_ENABLED=0 GOBIN=/out GOTOOLCHAIN=auto
+RUN mkdir -p /out \
+ && go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest \
+ && go install github.com/projectdiscovery/httpx/cmd/httpx@latest \
+ && go install github.com/ffuf/ffuf/v2@latest \
+ && go install github.com/projectdiscovery/katana/cmd/katana@latest \
+ && go install github.com/lc/gau/v2/cmd/gau@latest \
+ && go install github.com/hahwul/dalfox/v2@latest \
+ && go install github.com/jaeles-project/gospider@latest \
+ && go install github.com/tomnomnom/waybackurls@latest \
+ && go install github.com/tomnomnom/gf@latest \
+ && go install github.com/tomnomnom/qsreplace@latest
+RUN go install github.com/owasp-amass/amass/v4/...@v4.2.0
+RUN go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+
+# ── Stage 2: build the Community binaries from THIS repo ───────────────────────
+# The CE server + engine are pure-Go and build from source here — no proprietary
+# scan-brain binary (the old docker/Dockerfile's `COPY docker/bin/cypture` is gone).
+FROM golang:1.24-bookworm AS build
+ENV CGO_ENABLED=0 GOOS=linux GOTOOLCHAIN=auto
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN go build -o /out/cypture ./cmd/cypture \
+ && go build -o /out/cypture-engine ./cmd/cypture-engine
+
+# ── Stage 3: runtime ──────────────────────────────────────────────────────────
+FROM debian:bookworm-slim
+
+# Core + the CLI tools the expert agents invoke via bash. nodejs/npm added for the
+# opencode agent runtime + its loop-enforcer plugin.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates curl bash tar jq \
+        procps dnsutils python3 python3-pip netcat-openbsd wget \
+        nmap sqlmap whatweb git unzip openssl \
+        chromium fonts-liberation \
+        nodejs npm \
+    && rm -rf /var/lib/apt/lists/*
+
+# opencode agent runtime (matches the @opencode-ai/plugin the KB pins).
+RUN npm install -g opencode-ai@latest \
+ && (command -v opencode || ln -sf "$(npm root -g)/opencode-ai/bin/opencode" /usr/local/bin/opencode) \
+ && opencode --version || true
+
+# Wordlists: SecLists (pentest-relevant subset).
+RUN git clone --depth 1 https://github.com/danielmiessler/SecLists.git /usr/share/seclists \
+    && rm -rf /usr/share/seclists/.git \
+        /usr/share/seclists/Passwords /usr/share/seclists/Usernames \
+        /usr/share/seclists/Miscellaneous /usr/share/seclists/IOT \
+        /usr/share/seclists/Ai /usr/share/seclists/Pattern-Matching \
+    && mkdir -p /usr/share/wordlists \
+    && ln -s /usr/share/seclists /usr/share/wordlists/seclists \
+    && ln -s /usr/share/seclists/Discovery/Web-Content/common.txt /usr/share/wordlists/common.txt
+
+# arjun (param discovery).
+RUN pip3 install --no-cache-dir --break-system-packages arjun && command -v arjun
+
+# Neural-RAG statics (non-fatal — falls back to TF-IDF if the download fails).
+RUN pip3 install --no-cache-dir --break-system-packages numpy model2vec >/dev/null 2>&1 \
+ && python3 -c "from model2vec import StaticModel; StaticModel.from_pretrained('minishlab/potion-base-8M')" >/dev/null 2>&1 \
+ && echo "NEURAL_RAG_OK" || echo "NEURAL_RAG_SKIPPED (TF-IDF fallback active)"
+ENV HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
+
+# Headless browser for browser_* MCP tools (DOM-XSS / JS SPAs).
+ENV CYP_CHROME_PATH=/usr/bin/chromium
+
+# Recon + fuzzing toolchain from stage 1.
+COPY --from=recon /out/subfinder /usr/local/bin/subfinder
+COPY --from=recon /out/httpx     /usr/local/bin/httpx
+COPY --from=recon /out/ffuf      /usr/local/bin/ffuf
+COPY --from=recon /out/katana    /usr/local/bin/katana
+COPY --from=recon /out/gau       /usr/local/bin/gau
+COPY --from=recon /out/amass     /usr/local/bin/amass
+COPY --from=recon /out/nuclei    /usr/local/bin/nuclei
+COPY --from=recon /out/dalfox      /usr/local/bin/dalfox
+COPY --from=recon /out/gospider    /usr/local/bin/gospider
+COPY --from=recon /out/waybackurls /usr/local/bin/waybackurls
+COPY --from=recon /out/gf          /usr/local/bin/gf
+COPY --from=recon /out/qsreplace   /usr/local/bin/qsreplace
+
+# feroxbuster + jwt_tool + SSTImap (agents call these via bash).
+RUN set -eux; \
+    curl -sSL https://github.com/epi052/feroxbuster/releases/latest/download/x86_64-linux-feroxbuster.tar.gz -o /tmp/ferox.tgz \
+ && tar -xzf /tmp/ferox.tgz -C /usr/local/bin feroxbuster && chmod +x /usr/local/bin/feroxbuster && rm /tmp/ferox.tgz; \
+    git clone --depth 1 https://github.com/ticarpi/jwt_tool /opt/jwt_tool \
+ && pip3 install --break-system-packages --no-cache-dir pycryptodomex requests termcolor cprint >/dev/null 2>&1 || true; \
+    printf '#!/bin/sh\nexec python3 /opt/jwt_tool/jwt_tool.py "$@"\n' > /usr/local/bin/jwt_tool && chmod +x /usr/local/bin/jwt_tool; \
+    git clone --depth 1 https://github.com/vladko312/SSTImap /opt/sstimap \
+ && pip3 install --break-system-packages --no-cache-dir -r /opt/sstimap/requirements.txt >/dev/null 2>&1 || true; \
+    printf '#!/bin/sh\nexec python3 /opt/sstimap/sstimap.py "$@"\n' > /usr/local/bin/sstimap && chmod +x /usr/local/bin/sstimap \
+ && ln -sf /usr/local/bin/sstimap /usr/local/bin/tplmap
+
+# Bundle nuclei templates at build time (background worker never waits at scan time).
+RUN nuclei -update-templates -silent >/dev/null 2>&1 || true
+
+# The Community binaries (server + engine), built from source in stage 2.
+COPY --from=build /out/cypture         /usr/local/bin/cypture
+COPY --from=build /out/cypture-engine  /usr/local/bin/cypture-engine
+
+# The opencode adapter shim, invoked by the live runner as `cypture-agent`.
+COPY scripts/opencode-shim /usr/local/bin/cypture-agent
+
+# Agent knowledge base (agents + skills + scripts + plugin) and the web UI.
+COPY agent /agent
+COPY frontend /frontend
+# Vendor the loop-enforcer plugin dependency (@opencode-ai/plugin) — anti-early-stop.
+RUN cd /agent/.cypture && (npm ci || npm install) >/dev/null 2>&1 || echo "plugin npm install skipped"
+
+COPY docker/entrypoint-ce.sh /entrypoint-ce.sh
+COPY docker/nuclei_async.sh /usr/local/bin/nuclei_async.sh
+
+RUN chmod +x /usr/local/bin/cypture /usr/local/bin/cypture-engine /usr/local/bin/cypture-agent \
+        /usr/local/bin/subfinder /usr/local/bin/httpx /usr/local/bin/ffuf \
+        /usr/local/bin/katana /usr/local/bin/gau /usr/local/bin/amass \
+        /usr/local/bin/dalfox /usr/local/bin/gospider /usr/local/bin/waybackurls \
+        /usr/local/bin/gf /usr/local/bin/qsreplace \
+        /usr/local/bin/nuclei /usr/local/bin/nuclei_async.sh /entrypoint-ce.sh \
+ && mkdir -p /root/.local/share/opencode /root/.local/share/cypture-agent /data /work
+
+# CE defaults (override via compose .env). The live runner is wired in-container.
+ENV CYPTURE_RUNNER=live \
+    CYPTURE_AGENT_DIR=/agent \
+    CYPTURE_FRONTEND_DIR=/frontend \
+    CYPTURE_AGENT_BIN=/usr/local/bin/cypture-agent \
+    CYPTURE_ENGINE_BIN=cypture-engine \
+    CYPTURE_DB_PATH=/data/cypture.db \
+    CYPTURE_HOST=0.0.0.0 \
+    CYPTURE_PORT=7777 \
+    CYPTURE_RUNNER_AGENT=cypture-orchestrator
+
+WORKDIR /
+EXPOSE 7777
+ENTRYPOINT ["/entrypoint-ce.sh"]
