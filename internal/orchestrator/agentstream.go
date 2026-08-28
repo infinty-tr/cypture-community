@@ -30,8 +30,36 @@ func tailAgents(ctx context.Context, dir string, ctrl Controller) {
 			}
 			seen[name] = true
 
-			lane := friendlySubagent(strings.TrimSuffix(name, ".ndjson"))
+			handle := strings.TrimSuffix(name, ".ndjson")
+			lane := friendlySubagent(handle)
 			go tailAgentFile(ctx, filepath.Join(dir, name), lane, ctrl)
+			go watchAgentDone(ctx, filepath.Join(dir, handle+".status"), lane, ctrl)
+		}
+	}
+}
+
+// watchAgentDone polls a sub-agent's .status file and, when it finishes, emits a
+// pane-close so the cockpit window flips from "awaiting response" to done even if
+// the agent exited quietly without printing its own "✅ … completed" line
+// (e.g. an api-test agent that found the surface auth-gated and stopped early).
+func watchAgentDone(ctx context.Context, statusPath, lane string, ctrl Controller) {
+	tick := time.NewTicker(500 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+		}
+		b, err := os.ReadFile(statusPath)
+		if err != nil {
+			continue
+		}
+		if s := strings.TrimSpace(string(b)); s == "done" || s == "error" {
+			// "✅ … completed" is the marker paneFor() recognises to close a pane.
+			ctrl.Emit(Event{Level: LevelSystem, Category: CatSystem, Lane: lane,
+				Message: "✅ " + lane + " completed"})
+			return
 		}
 	}
 }

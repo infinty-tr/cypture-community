@@ -86,10 +86,15 @@ func heartbeatMsg(n int, elapsed time.Duration) string {
 
 func fmtElapsed(d time.Duration) string {
 	d = d.Round(time.Second)
-	m := int(d.Minutes())
+	h := int(d.Hours())
+	m := int(d.Minutes()) % 60
 	s := int(d.Seconds()) % 60
-	if m > 0 {
-		return fmt.Sprintf("%dd %02dsn", m, s)
+	switch {
+	case h > 0:
+		return fmt.Sprintf("%dsa %02ddk %02dsn", h, m, s)
+	case m > 0:
+		return fmt.Sprintf("%ddk %02dsn", m, s)
+	default:
+		return fmt.Sprintf("%dsn", s)
 	}
-	return fmt.Sprintf("%dsn", s)
 }
