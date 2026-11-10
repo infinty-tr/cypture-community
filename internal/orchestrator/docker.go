@@ -95,6 +95,23 @@ func (DockerRunner) Run(ctx context.Context, spec RunSpec, ctrl Controller) erro
 		args = append(args, "-e", "CYP_TEST_CREDS="+c)
 	}
 
+	// Propagate the operator's internal-target opt-in to the engine inside the
+	// container; absent, the engine's dial-time SSRF guard defaults to blocking
+	// internal/metadata IPs (the safe default for an isolated runner).
+	if v := strings.TrimSpace(os.Getenv("CYPTURE_ALLOW_INTERNAL_TARGETS")); v != "" {
+		args = append(args, "-e", "CYPTURE_ALLOW_INTERNAL_TARGETS="+v)
+	}
+
+	if sp := strings.TrimSpace(spec.SourcePath); sp != "" {
+		// Grey-box source. A local directory is mounted read-only at a fixed path;
+		// an https git URL is passed through for the in-container ingestion to clone.
+		if strings.HasPrefix(strings.ToLower(sp), "https://") {
+			args = append(args, "-e", "CYP_SOURCE_PATH="+sp)
+		} else {
+			args = append(args, "-v", sp+":/source-ro:ro", "-e", "CYP_SOURCE_PATH=/source-ro")
+		}
+	}
+
 	if spec.LLMAPIKey != "" {
 		kf, err := os.CreateTemp("", "cyp-key-*")
 		if err != nil {

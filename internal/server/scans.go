@@ -95,6 +95,7 @@ type adminScanReq struct {
 	Model           string   `json:"model"`
 	OperatorPrompt  string   `json:"operator_prompt"`
 	TestCredentials string   `json:"test_credentials"`
+	SourcePath      string   `json:"source_path"`
 }
 
 func (s *Server) handleAdminCreateScan(w http.ResponseWriter, r *http.Request) {
@@ -143,6 +144,14 @@ func (s *Server) handleAdminCreateScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	srcPath := strings.TrimSpace(req.SourcePath)
+	if srcPath != "" {
+		if reason := validateSourcePath(srcPath); reason != "" {
+			writeErr(w, http.StatusBadRequest, "invalid source: "+reason)
+			return
+		}
+	}
+
 	now := time.Now()
 	e := models.Engagement{
 		ClientID:        actor.ID,
@@ -155,6 +164,7 @@ func (s *Server) handleAdminCreateScan(w http.ResponseWriter, r *http.Request) {
 		Model:           model,
 		OperatorPrompt:  strings.TrimSpace(req.OperatorPrompt),
 		TestCredentials: strings.TrimSpace(req.TestCredentials),
+		SourcePath:      srcPath,
 		Status:          models.EngAccepted,
 		ReviewedByID:    &actor.ID,
 		SubmittedAt:     &now,

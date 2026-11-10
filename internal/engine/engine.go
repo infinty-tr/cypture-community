@@ -81,6 +81,10 @@ type Engine struct {
 	scopeEx   []string
 	defClient *http.Client
 
+	// allowInternal mirrors CYPTURE_ALLOW_INTERNAL_TARGETS; when false (default)
+	// the dial-time SSRF guard refuses internal/private/metadata IPs.
+	allowInternal bool
+
 	bodyCap     int
 	historyMax  int
 	bodyBudget  int64
@@ -276,17 +280,20 @@ func (e *Engine) trafficWrite(en *Entry) {
 }
 
 func New(includes, excludes []string) *Engine {
-	return &Engine{
-		sessions:    map[string]*http.Client{},
-		scopeIn:     includes,
-		scopeEx:     excludes,
-		defClient:   newClient(),
-		bodyCap:     defaultBodyCap,
-		historyMax:  defaultHistoryMax,
-		bodyBudget:  defaultBodyBudget,
-		baselines:   map[string]string{},
-		passiveSeen: map[string]bool{},
+	e := &Engine{
+		sessions:      map[string]*http.Client{},
+		scopeIn:       includes,
+		scopeEx:       excludes,
+		bodyCap:       defaultBodyCap,
+		historyMax:    defaultHistoryMax,
+		bodyBudget:    defaultBodyBudget,
+		baselines:     map[string]string{},
+		passiveSeen:   map[string]bool{},
+		allowInternal: allowInternalTargets(),
 	}
+	// defClient (and every session client) dials through the SSRF guard.
+	e.defClient = newClient(e.dialControl)
+	return e
 }
 
 func (e *Engine) passiveFirst(key string) bool {
@@ -302,12 +309,14 @@ func (e *Engine) passiveFirst(key string) bool {
 	return true
 }
 
-func newClient() *http.Client {
+func newClient(control dialControlFn) *http.Client {
 	jar, _ := cookiejar.New(nil)
+	dialer := &net.Dialer{Timeout: 10 * time.Second, Control: control}
 	return &http.Client{
 		Jar:     jar,
 		Timeout: 12 * time.Second,
 		Transport: &http.Transport{
+			DialContext:         dialer.DialContext,
 			TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
 			MaxIdleConns:        50,
 			IdleConnTimeout:     30 * time.Second,
@@ -348,7 +357,7 @@ func (e *Engine) InScope(host string) bool {
 func (e *Engine) CreateSession() string {
 	id := e.nextID("sess")
 	e.mu.Lock()
-	e.sessions[id] = newClient()
+	e.sessions[id] = newClient(e.dialControl)
 	e.mu.Unlock()
 	return id
 }
@@ -362,7 +371,7 @@ func (e *Engine) clientFor(sessionID string) *http.Client {
 	if c, ok := e.sessions[sessionID]; ok {
 		return c
 	}
-	c := newClient()
+	c := newClient(e.dialControl)
 	e.sessions[sessionID] = c
 	return c
 }
@@ -580,7 +589,7 @@ func (e *Engine) rawSocketSend(raw, bareHost string, port int, tlsOn bool, sessi
 	start := time.Now()
 	var conn net.Conn
 	var err error
-	dialer := &net.Dialer{Timeout: 15 * time.Second}
+	dialer := &net.Dialer{Timeout: 15 * time.Second, Control: e.dialControl}
 	if tlsOn {
 		conn, err = tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{InsecureSkipVerify: true, ServerName: bareHost})
 	} else {

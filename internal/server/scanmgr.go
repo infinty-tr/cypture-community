@@ -291,6 +291,7 @@ func (m *ScanManager) Start(e *models.Engagement) (string, error) {
 		ScopeExcludes:   decodeList(e.ScopeExcludes),
 		OperatorPrompt:  e.OperatorPrompt,
 		TestCredentials: e.TestCredentials,
+		SourcePath:      e.SourcePath,
 		WorkDir:         workdir,
 		AgentDir:        m.cfg.AgentDir,
 		AgentBin:        m.cfg.AgentBin,
@@ -516,6 +517,7 @@ type runController struct {
 
 	meterMu   sync.Mutex
 	meterMsgs map[string]meterMsg
+	meterNoID int64 // counter for usage events lacking a msg_id (they must sum, not max-collapse)
 
 	findMu sync.Mutex
 
@@ -609,9 +611,6 @@ func (c *runController) meter(d map[string]any) {
 		return
 	}
 	id := dataStr(d, "msg_id")
-	if id == "" {
-		id = "_"
-	}
 	costUSD := dataNum(d, "cost_usd")
 	tin := int64(dataNum(d, "tokens_input"))
 	tout := int64(dataNum(d, "tokens_output"))
@@ -634,6 +633,13 @@ func (c *runController) meter(d map[string]any) {
 	}
 
 	c.meterMu.Lock()
+	if id == "" {
+		// No stable msg_id: we cannot dedup this against prior cumulative reports,
+		// so give each such event its own bucket. Buckets are summed below, so
+		// distinct no-id events accumulate instead of collapsing to a single max.
+		c.meterNoID++
+		id = fmt.Sprintf("_noid_%d", c.meterNoID)
+	}
 	prev := c.meterMsgs[id]
 	c.meterMsgs[id] = meterMsg{
 		cost: maxI64(micros, prev.cost),

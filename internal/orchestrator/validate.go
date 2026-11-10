@@ -9,12 +9,28 @@ import (
 	"time"
 )
 
+// validateSem caps the number of concurrent LLM-validation containers across ALL
+// callers (admin settings/validate, admin api-keys, and the per-user
+// /api/settings/llm path that is open to any authenticated role). Without it a
+// low-privilege user could fire many `validate` requests and spawn unbounded
+// `docker run` containers, exhausting host CPU/memory/disk (DoS).
+var validateSem = make(chan struct{}, 3)
+
 func ValidateLLM(ctx context.Context, image, apiKey, provider, model string) (bool, string) {
 	if image == "" {
 		image = "cypture-engine:latest"
 	}
 	if strings.TrimSpace(apiKey) == "" || strings.TrimSpace(model) == "" {
 		return false, "key and model are required"
+	}
+
+	// Bound concurrent validation containers; reject rather than queue so a burst
+	// of requests cannot pile up host resources.
+	select {
+	case validateSem <- struct{}{}:
+		defer func() { <-validateSem }()
+	default:
+		return false, "validation is busy — too many checks running, try again shortly"
 	}
 	prov := strings.TrimSpace(provider)
 	if i := strings.Index(model, "/"); i > 0 {

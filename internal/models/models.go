@@ -117,6 +117,12 @@ type Engagement struct {
 
 	TestCredentials string `json:"test_credentials"`
 
+	// SourcePath is an OPTIONAL local path (or git URL) to the target's own source
+	// code, supplied by the operator. When set, the scan runs in grey-box mode: the
+	// agent may read the ingested source under $WS/source to guide live testing.
+	// Empty = pure blackbox (the default, unchanged behaviour).
+	SourcePath string `json:"source_path"`
+
 	Status       EngagementStatus `gorm:"index;not null" json:"status"`
 	ReviewedByID *string          `json:"reviewed_by_id,omitempty"`
 	SubmittedAt  *time.Time       `json:"submitted_at,omitempty"`

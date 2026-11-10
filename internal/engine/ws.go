@@ -15,7 +15,7 @@ import (
 func (e *Engine) mitmWebSocket(client net.Conn, clientBR *bufio.Reader, req *http.Request, host string, port int) {
 
 	addr := host + ":" + strconv.Itoa(port)
-	up, err := tls.DialWithDialer(&net.Dialer{Timeout: 12 * time.Second}, "tcp", addr,
+	up, err := tls.DialWithDialer(&net.Dialer{Timeout: 12 * time.Second, Control: e.dialControl}, "tcp", addr,
 		&tls.Config{InsecureSkipVerify: true, ServerName: host})
 	if err != nil {
 		writeRawResponse(client, 502, "text/plain", "ws upstream dial error: "+err.Error())

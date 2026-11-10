@@ -56,7 +56,8 @@ func (e *Engine) proxyConnect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	e.feedWrite(map[string]any{"t": "connect", "host": bare, "tls": true})
-	dest, derr := net.DialTimeout("tcp", ensurePort(hostPort, "443"), 15*time.Second)
+	connectDialer := &net.Dialer{Timeout: 15 * time.Second, Control: e.dialControl}
+	dest, derr := connectDialer.Dial("tcp", ensurePort(hostPort, "443"))
 	if derr != nil {
 		_ = client.Close()
 		return

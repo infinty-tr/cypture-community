@@ -77,7 +77,7 @@ func (e *Engine) RaceSend(reqs []RaceRequest, host string, port int, tlsOn bool,
 			}
 			method, path := rawRequestLine(raw)
 
-			dialer := &net.Dialer{Timeout: 15 * time.Second}
+			dialer := &net.Dialer{Timeout: 15 * time.Second, Control: e.dialControl}
 			var conn net.Conn
 			var err error
 			if tlsOn {

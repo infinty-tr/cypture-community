@@ -136,6 +136,7 @@
                 scope_text: $('ns-text').value.trim(),
                 operator_prompt: ($('ns-prompt')?.value || '').trim(),
                 test_credentials: ($('ns-creds')?.value || '').trim(),
+                source_path: ($('ns-source')?.value || '').trim(),
                 mode: state.newMode,
                 model: state.newModel,
             });
@@ -143,6 +144,7 @@
             $('ns-inc').value = ''; $('ns-exc').value = ''; $('ns-text').value = ''; $('ns-title').value = '';
             if ($('ns-prompt')) $('ns-prompt').value = '';
             if ($('ns-creds')) $('ns-creds').value = '';
+            if ($('ns-source')) $('ns-source').value = '';
             location.hash = `scan/${r.scan_id}`;
         } catch (e) { flash($('ns-msg'), e.message, true); }
         finally { $('ns-start').disabled = false; }

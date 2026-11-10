@@ -64,6 +64,7 @@ type RunSpec struct {
 	ScopeExcludes   []string
 	OperatorPrompt  string
 	TestCredentials string
+	SourcePath      string // optional grey-box source (local dir or https git URL)
 	WorkDir         string
 	AgentDir        string
 
