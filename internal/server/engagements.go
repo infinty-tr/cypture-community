@@ -49,16 +49,20 @@ func toEngagementDTO(e *models.Engagement, withClient bool) engagementDTO {
 		Mode:          e.Mode,
 		Model:         e.Model,
 		ClientNotes:   e.ClientNotes,
-		AdminNotes:    e.AdminNotes,
 		Status:        string(e.Status),
 		CreatedAt:     e.CreatedAt.Format(time.RFC3339),
 		SubmittedAt:   tstr(e.SubmittedAt),
 		AcceptedAt:    tstr(e.AcceptedAt),
 	}
-	if withClient && e.Client != nil {
-		d.ClientEmail = e.Client.Email
-		d.CompanyName = e.Client.CompanyName
-		d.ClientHasKey = strings.TrimSpace(e.Client.LLMAPIKey) != ""
+	// AdminNotes are internal reviewer notes — only expose them on the admin view
+	// (withClient), never on the client-facing scan-status response.
+	if withClient {
+		d.AdminNotes = e.AdminNotes
+		if e.Client != nil {
+			d.ClientEmail = e.Client.Email
+			d.CompanyName = e.Client.CompanyName
+			d.ClientHasKey = strings.TrimSpace(e.Client.LLMAPIKey) != ""
+		}
 	}
 	return d
 }

@@ -126,7 +126,10 @@ func (s *Server) handleAcceptEngagement(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if tc := strings.TrimSpace(req.TestCredentials); tc != "" {
-		upd["test_credentials"] = tc
+		// Map Updates() bypasses the BeforeSave encryption hook (the hook mutates
+		// the struct, not the map), so encrypt explicitly to avoid storing the
+		// credential in cleartext when CYP_DATA_KEY is configured.
+		upd["test_credentials"] = models.EncryptField(tc)
 		e.TestCredentials = tc
 	}
 	s.DB.Model(e).Updates(upd)

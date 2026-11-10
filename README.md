@@ -109,8 +109,12 @@ under the service's `volumes` in `docker-compose.yml`.
 
 > **Scan quality still depends on the model.** Pick a capable agentic
 > `CYPTURE_RUNNER_MODEL` — a weak/free model may stall instead of driving the
-> specialist agents. The agents are blackbox‑only (they test the live target and never
-> clone/read a target app's source).
+> specialist agents. By default the agents are blackbox (they test the live target and
+> do not read a target app's source). **Grey‑box (optional):** if you supply the
+> target's own source in the admin "Source code (grey‑box)" field (an absolute local
+> path or an https git URL), the agents also read that source to map routes/sinks/auth
+> and guide live testing — but every finding is still proven against the live target.
+> Reading external 3rd‑party/OSS source from the internet stays disabled.
 >
 > **Isolation note.** In this all‑in‑one image, scans run in the same container as the
 > server (fine for a single‑operator self‑host). There is no per‑scan network egress

@@ -104,6 +104,7 @@
                 <div class="cyp-field"><label>Note (optional)</label><textarea class="cyp-textarea" id="ns-text" placeholder="scope note…"></textarea></div>
                 <div class="cyp-field"><label>Extra directive for the agent (optional)</label><textarea class="cyp-textarea" id="ns-prompt" placeholder="e.g. focus on the /api/v2 surface · try JWT RS256, key confusion · skip noisy fuzzing · emphasize business-logic / response manipulation"></textarea></div>
                 <div class="cyp-field"><label>Test identity / account (optional · authenticated test)</label><textarea class="cyp-textarea" id="ns-creds" placeholder="e.g. user1: alice@target.com / Password123 · user2: bob@target.com / Password456 · login: /login (provide two accounts for IDOR/BOLA). The agent logs in with these and tests the post-authentication surface."></textarea></div>
+                <div class="cyp-field"><label>Source code (optional · grey-box)</label><input class="cyp-input" id="ns-source" type="text" placeholder="absolute local path (e.g. /srv/apps/acme) or an https git URL. When set, the agent reads the target's own source to guide live testing — findings are still proven against the live target." autocomplete="off"></div>
                 <div class="admin-row">
                     <button class="btn btn-scan" id="ns-start" type="button"><span class="btn-icon">▶</span> <span class="btn-text">START SCAN</span></button>
                     <span class="admin-msg" id="ns-msg"></span>

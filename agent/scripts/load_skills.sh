@@ -57,11 +57,18 @@ declare -A MAP=(
   [email_injection]="vuln-email-injection"
   [prompt_injection]="vuln-prompt-injection"
   [formula_injection]="vuln-formula-injection"
+  [source]="whitebox-source-recon whitebox-sast"
 )
 case "$TECH" in *xml*|*soap*) EXTRA="vuln-xxe";; *) EXTRA="";; esac
 echo "$HOST$TECH" | grep -qiE 'cdn|cache|proxy|gateway|cloudflare|akamai|fastly|nginx|varnish' && EXTRA="$EXTRA vuln-http-request-smuggling vuln-crlf-header-injection vuln-cache-poisoning-deception"
 echo "$HOST$TECH" | grep -qiE 'telerik|asp\.?net|x-aspnet|iis|struts|spring|log4j|java|jboss|weblogic|citrix|confluence|atlassian|jenkins|gitlab|sharepoint|exchange|owa|fortinet|fortigate|f5|big-?ip|drupal|wordpress|wp-|joomla|vbulletin|jira' && EXTRA="$EXTRA vuln-known-cve"
 EXTRA="$EXTRA chain-recipes vuln-tls-crypto"
+
+# Grey-box: operatör hedef kaynağını verdiyse ($WS/source → source.json, veya
+# surface.json içine birleştirilmiş .source) whitebox skill'lerini her host için ekle.
+if [ -f "$(dirname "$SURF")/source.json" ] || jq -e '.source' "$SURF" >/dev/null 2>&1; then
+  EXTRA="$EXTRA whitebox-source-recon whitebox-sast"
+fi
 
 WANT=""
 for c in $CLASSES; do WANT="$WANT ${MAP[$c]:-}"; done

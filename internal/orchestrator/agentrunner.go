@@ -121,6 +121,10 @@ func (AgentRunner) Run(ctx context.Context, spec RunSpec, ctrl Controller) error
 	if strings.TrimSpace(spec.TestCredentials) != "" {
 		env = append(env, "CYP_TEST_CREDS="+spec.TestCredentials)
 	}
+	if strings.TrimSpace(spec.SourcePath) != "" {
+		// Grey-box: preflight.sh ingests this into $WS/source for the agents to read.
+		env = append(env, "CYP_SOURCE_PATH="+spec.SourcePath)
+	}
 	cmd.Env = env
 
 	// Group sub-agent activity into cockpit panes/lanes, exactly like the

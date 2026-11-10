@@ -209,6 +209,12 @@ func (s *Server) handleScanWS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
+	// WS re-implements auth inline, so it must also enforce the policy gates that
+	// RequireAuth applies (this route is registered without the middleware).
+	if u.MustChangePassword {
+		http.Error(w, "password change required", http.StatusForbidden)
+		return
+	}
 
 	up := s.upgrader()
 	ws, err := up.Upgrade(w, r, nil)

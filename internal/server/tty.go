@@ -86,6 +86,18 @@ func (s *Server) handleScanTTY(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
+	// TTY is registered without RequireAuth and is INTERACTIVE (writes keystrokes
+	// to the spawned process), so it must enforce the same policy gates the
+	// middleware would: a must-change-password user is confined to that, and a
+	// read-only viewer may not drive an interactive session.
+	if u.MustChangePassword {
+		http.Error(w, "password change required", http.StatusForbidden)
+		return
+	}
+	if u.Role == models.RoleViewer {
+		http.Error(w, "read-only viewer account", http.StatusForbidden)
+		return
+	}
 
 	if !ttyAcquireUser(u.ID) {
 		http.Error(w, "too many live viewers", http.StatusServiceUnavailable)

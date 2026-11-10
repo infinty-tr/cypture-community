@@ -3,9 +3,12 @@
 Hedefin teknoloji+sürümü tespit edildiğinde **jenerik sınıf testiyle yetinme** — o ürün/sürüme ait
 BİLİNEN CVE'leri imzayla test et. En yüksek-etkili (genelde RCE/auth-bypass) açıklar burada saklı.
 
-> ⛔ BLACKBOX: CVE'yi **canlı hedefte** `cyp_send_request` ile imzala/doğrula (ürüne-özel yol, hata
-> imzası, payload). Upstream kaynağı OKUMA / repo KLONLAMA / GitHub-NVD'ye curl-webfetch YAPMA —
-> parmak izi bilgin (Server/sürüm/yol) yeterli; kanıtı canlı endpoint üretir.
+> 🔎 GREY-BOX: CVE'yi **canlı hedefte** `cyp_send_request` ile imzala/doğrula (ürüne-özel yol, hata
+> imzası, payload) — kanıt HER ZAMAN canlı endpoint'te üretilir. İNTERNETTEN upstream/OSS kaynağı
+> OKUMA / repo KLONLAMA / GitHub-NVD'ye curl-webfetch YAPMA (dış-kaynak yasağı sürüyor; bkz.
+> [[core-contract]] 3c). İSTİSNA: operatör `$WS/source/`'ta hedefin KENDİ kaynağını verdiyse, oradan
+> sürüm/bağımlılık (go.mod, package-lock, pom.xml) ve savunmasız kod yolunu OKUmak serbest — ama
+> kanıt yine canlı imzayla üretilir.
 
 ## AKIŞ
 1. **Parmak izi:** `Server`/`X-Powered-By`/`X-AspNet-Version` başlıkları, hata sayfaları, ürün-özel yollar (`/Telerik.Web.UI.WebResource.axd`, `/_layouts/`, `/struts2-showcase/`), JS/asset sürümleri, `httpx -tech-detect` çıktısı.

@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -12,6 +13,43 @@ import (
 // targets (their own apps). It is OPT-IN via CYPTURE_ALLOW_INTERNAL_TARGETS=true —
 // off by default, since reaching internal/metadata ranges is an SSRF risk on a
 // shared/hosted deployment. On a single-operator self-host it is a normal use case.
+// validateSourcePath checks the optional grey-box source location supplied by the
+// operator at scan creation. It accepts either (a) an absolute local directory
+// that exists, or (b) an explicit https git URL (cloned by the ingestion script).
+// It returns "" when valid, or a human-readable reason otherwise. Relative paths
+// and non-https schemes are rejected to avoid ambiguity and unsafe fetches.
+func validateSourcePath(p string) string {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return ""
+	}
+	low := strings.ToLower(p)
+	if strings.HasPrefix(low, "http://") || strings.HasPrefix(low, "https://") {
+		u, err := url.Parse(p)
+		if err != nil || u.Host == "" {
+			return "malformed URL"
+		}
+		if u.Scheme != "https" {
+			return "only https git URLs are allowed"
+		}
+		return ""
+	}
+	if strings.Contains(p, "://") {
+		return "unsupported scheme (use an absolute local path or an https git URL)"
+	}
+	if !filepath.IsAbs(p) {
+		return "local source path must be absolute"
+	}
+	info, err := os.Stat(p)
+	if err != nil {
+		return "path does not exist or is not readable"
+	}
+	if !info.IsDir() {
+		return "path is not a directory"
+	}
+	return ""
+}
+
 func allowInternalTargets() bool {
 	v := strings.ToLower(strings.TrimSpace(os.Getenv("CYPTURE_ALLOW_INTERNAL_TARGETS")))
 	return v == "1" || v == "true" || v == "yes"

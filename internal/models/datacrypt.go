@@ -28,6 +28,11 @@ func dataKey() []byte {
 	return nil
 }
 
+// EncryptField exposes the at-rest field encryption for callers that persist via
+// a GORM map Updates() (where the BeforeSave hook cannot mutate the written
+// value). It is idempotent: an already-encrypted or empty value is returned as-is.
+func EncryptField(s string) string { return encryptField(s) }
+
 func encryptField(s string) string {
 	if s == "" || strings.HasPrefix(s, encPrefix) {
 		return s

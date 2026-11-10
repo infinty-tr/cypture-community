@@ -174,6 +174,19 @@ func k8sEngineEnv(spec RunSpec, depth string, keyMounted bool, ctrl Controller) 
 	if c := strings.TrimSpace(spec.TestCredentials); c != "" {
 		env = append(env, [2]string{"CYP_TEST_CREDS", c})
 	}
+	if v := strings.TrimSpace(os.Getenv("CYPTURE_ALLOW_INTERNAL_TARGETS")); v != "" {
+		env = append(env, [2]string{"CYPTURE_ALLOW_INTERNAL_TARGETS", v})
+	}
+	if sp := strings.TrimSpace(spec.SourcePath); sp != "" {
+		// Only an https git URL is portable to a Pod (a host dir would need a
+		// volume the cluster can mount); the in-Pod ingestion clones it.
+		if strings.HasPrefix(strings.ToLower(sp), "https://") {
+			env = append(env, [2]string{"CYP_SOURCE_PATH", sp})
+		} else {
+			ctrl.Emit(Event{Level: LevelWarning, Category: CatSystem, Module: "Çekirdek",
+				Message: "Grey-box source skipped on the k8s runner: a local path cannot be mounted into a Pod — use an https git URL, or the docker/live runner."})
+		}
+	}
 	if keyMounted {
 		env = append(env, [2]string{"CYP_LLM_API_KEY_FILE", "/cyp/cyp_llm_key"})
 		if spec.LLMProvider != "" {
